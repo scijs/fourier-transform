@@ -69,7 +69,7 @@ test('stft', function () {
 });
 
 
-test.skip('frequencyjs', function () {
+test('frequencyjs', function () {
 	var fjs = require('frequencyjs');
 
 	test('dft ' + max + ' ×', function () {
@@ -87,7 +87,7 @@ test.skip('frequencyjs', function () {
 
 
 
-test.skip('fourier', function () {
+test('fourier', function () {
 	var fourier = require('fourier');
 	var fourierFFTRun = fourier.fft();
 	test('fft', function () {
