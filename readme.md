@@ -1,7 +1,5 @@
 # Fourier transform packages comparison
 
-Tired of looking for fourier transform package? Here is a benchmark of known fourier transform packages.
-
 The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes sense) in node6.
 
 Packages are npm-searched by keywords `fourier`, `fft` and alike.
