@@ -19,6 +19,23 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
+test('ml-fft', function () {
+	var lib = require("ml-fft");
+	var FFT = lib.FFT;
+
+	FFT.init(N);
+
+	test('run', function () {
+		for (var i = 0; i < max; i++) {
+			FFT.fft(real, im);
+		}
+	});
+});
+
+test.skip('kissfft');
+
+test.skip('node-fft');
+
 test('ndarray-fft', function () {
 	var fft = require('ndarray-fft');
 	var ndarray = require('ndarray');

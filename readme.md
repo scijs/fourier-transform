@@ -6,6 +6,8 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 
 Packages are just npm-searched by keywords `fourier` and `fft`.
 
+* []()
+* [ml-fft](https://www.npmjs.com/package/ml-fft) __0.32s__
 * [ndarray-fft](https://www.npmjs.com/package/ndarray-fft) __0.37s__
 * [fft](https://www.npmjs.com/package/fft) __4s__
 * [dsp-fft](https://www.npmjs.com/package/dsp-fft) __40s__
@@ -36,6 +38,5 @@ Packages are just npm-searched by keywords `fourier` and `fft`.
 	* fft-32-raw __0.29s__
 	* fft-32-asm __0.38s__
 
-Note: results are not verified, examples are based on packages’ readme/tests.
-
-If you want to see for yourself, clone repo, do `npm install` and `npm test`.
+PS. Results are not verified, examples are based on packages’ readme/tests.
+PPS. Results are opinionated single-run measurements, if you don’t believe - run for yourself: clone repo, do `npm install` and `npm test`.
