@@ -1,0 +1,33 @@
+{
+  "name": "fourier-transform",
+  "version": "1.0.0",
+  "description": "Collection of fourier transform methods",
+  "main": "research.js",
+  "scripts": {
+    "test": "node research.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dfcreative/fourier-transform.git"
+  },
+  "keywords": [
+    "fourier",
+    "dsp",
+    "fft",
+    "dft"
+  ],
+  "author": "ΔY <dfcreative@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dfcreative/fourier-transform/issues"
+  },
+  "homepage": "https://github.com/dfcreative/fourier-transform#readme",
+  "devDependencies": {
+    "tst": "^1.3.1"
+  },
+  "optionalDependencies": {
+    "fourier": "^0.1.2",
+    "frequencyjs": "0.0.4",
+    "stft": "0.0.0"
+  }
+}
