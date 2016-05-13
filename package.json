@@ -26,6 +26,11 @@
     "tst": "^1.3.1"
   },
   "optionalDependencies": {
+    "aureooms-js-array": "^3.1.0",
+    "aureooms-js-complex": "^1.2.0",
+    "aureooms-js-fft": "^1.0.1",
+    "aureooms-js-number": "^2.1.0",
+    "aureooms-js-random": "^1.0.2",
     "fourier": "^0.1.2",
     "frequencyjs": "0.0.4",
     "stft": "0.0.0"
