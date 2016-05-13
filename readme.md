@@ -42,4 +42,6 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 
 **PPPS.** I did not do any research of options of these packages, just used default settings. Quite possibly some packages use windowing, table creation or other pre-calculation which affects performance and can be disabled.
 
-**PPPPS.** If you feel like running benchmark for yourself or contributing: clone repo, do `npm install` and `npm test`. I was unable to compile [dsp](https://npmjs.org/package/dsp), [node-fft](https://npmjs.org/package/fft), [kissfft](https://npmjs.org/package/kissfft), you are welcome to contribute.
+**PPPPS.** I was unable to compile [dsp](https://npmjs.org/package/dsp), [node-fft](https://npmjs.org/package/fft), [kissfft](https://npmjs.org/package/kissfft). They have native bindings and may render decent results.
+
+**PPPPPS.** If you feel like running benchmark for yourself or contributing: clone repo, do `npm install` and `npm test`.
