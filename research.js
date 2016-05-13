@@ -18,8 +18,17 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
-test('stft', function () {
-	var stft = require('stft');
+var STFT = require('stft');
+test('stft', function (done) {
+	var count = 0;
+	var onfreq = function () {
+		count++;
+		if (count >= 10) done();
+	};
+	var stft = STFT(1, N, onfreq);
+	for (var i = 0; i < max; i++ ) {
+		stft(real);
+	}
 });
 
 
