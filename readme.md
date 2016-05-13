@@ -22,7 +22,7 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 * [fft-js](https://npmjs.org/package/fft-js)
 	* fft __39.4s__
 	* fftInPlace __120s__
-	* dft ∞s (I waited like for a couple of mins for single run and then bored)
+	* dft **∞s** (I waited like for a couple of mins for single run and then bored)
 * [aureoom-js-fft](https://npmjs.org/package/aureoom-js-fft) __11s__
 * [stft](https://npmjs.org/package/stft) __1.5s__
 * [frequencyjs](https://npmjs.org/package/frequencyjs)
