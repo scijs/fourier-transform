@@ -1,6 +1,8 @@
-Fourier transform packages comparison.
+# Fourier transform packages comparison
 
-The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes any sense) in node6. Probably should compare in various browsers as well (TODO.
+The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes any sense) in node6. Probably should compare in various browsers as well (TODO).
+
+Packages are just npm-searched by keywords `fourier` and `fft`.
 
 * [aureoom-js-fft](https://npmjs.org/package/aureoom-js-fft) 11s
 * [stft](https://npmjs.org/package/stft) 1.5s

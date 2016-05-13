@@ -18,6 +18,11 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
+test(, function () {
+
+});
+
+
 test('aureooms-js-fft', function () {
 	var fft = require( "aureooms-js-fft" );
 	var array = require( "aureooms-js-array" ) ;
