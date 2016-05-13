@@ -32,12 +32,16 @@
     "aureooms-js-number": "^2.1.0",
     "aureooms-js-random": "^1.0.2",
     "digitalsignals": "^1.0.0",
+    "dsp-fft": "0.0.0-semantically-released",
     "dsp.js": "github:corbanbrook/dsp.js",
     "dspjs": "^1.0.0",
+    "fft": "^0.2.1",
     "fft-js": "0.0.9",
     "fourier": "^0.1.2",
     "frequencyjs": "0.0.4",
     "gl-shader-output": "^2.0.1",
+    "ndarray": "^1.0.18",
+    "ndarray-fft": "^1.0.2",
     "regl": "^0.4.0",
     "stft": "0.0.0"
   }

@@ -1,9 +1,14 @@
 # Fourier transform packages comparison
 
-The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes any sense) in node6. Probably should compare in various browsers as well (TODO).
+Tired of looking for fourier transform package? Here is benchmark of known to npm fourier transform packages.
+
+The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes sense) in node6. Probably should compare in various browsers as well (TODO).
 
 Packages are just npm-searched by keywords `fourier` and `fft`.
 
+* [ndarray-fft](https://www.npmjs.com/package/ndarray-fft) __0.37s__
+* [fft](https://www.npmjs.com/package/fft) __4s__
+* [dsp-fft](https://www.npmjs.com/package/dsp-fft) __40s__
 * [webgl-dft](https://github.com/dfcreative/gl-fourier) __5.4s__
 * [corbanbrook/dsp.js](https://github.com/corbanbrook/dsp.js)
 	* fft __0.222s__
@@ -30,3 +35,7 @@ Packages are just npm-searched by keywords `fourier` and `fft`.
 	* ditRadix2Simple __0.731s__
 	* fft-32-raw __0.29s__
 	* fft-32-asm __0.38s__
+
+Note: results are not verified, examples are based on packages’ readme/tests.
+
+If you want to see for yourself, clone repo, do `npm install` and `npm test`.

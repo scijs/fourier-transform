@@ -19,6 +19,39 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
+test('ndarray-fft', function () {
+	var fft = require('ndarray-fft');
+	var ndarray = require('ndarray');
+	var x = ndarray(real);
+	var y = ndarray(im);
+	test('run', function () {
+		for (var i = 0; i < max; i++) {
+			fft(1, x, y);
+		}
+	});
+});
+
+test('fft', function () {
+	var FFT = require('fft');
+	var fft = new FFT.complex(N, false);
+	var out = new Float32Array(real);
+	test('run × 10', function () {
+		for (var i = 0; i < max/10; i++) {
+			fft.simple(out, real, 'real');
+		}
+	});
+});
+
+test('dsp-fft', function () {
+	var fft = require('dsp-fft').fft;
+	test('run × 100', function () {
+		for (var i = 0; i < max/100; i++) {
+			fft(real);
+		}
+	});
+});
+
+
 if (typeof document !== 'undefined') {
 test('webgl dft', function () {
 	var dft = require('./dft')(N, real);
