@@ -4,19 +4,23 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 
 Packages are just npm-searched by keywords `fourier` and `fft`.
 
+* [digitalsignals](https://www.npmjs.com/package/digitalsignals) — fork of dsp.js, nothing changed in code
+	* fft __0.321s__
+	* rfft (real-values only FFT) __0.139s__
+	* dft __150s__
 * [fft-js](https://npmjs.org/package/fft-js)
-	* fft 39.4s
-	* fftInPlace 120s
+	* fft __39.4s__
+	* fftInPlace __120s__
 	* dft ∞s (I waited like for a couple of mins for single run and then bored)
-* [aureoom-js-fft](https://npmjs.org/package/aureoom-js-fft) 11s
-* [stft](https://npmjs.org/package/stft) 1.5s
+* [aureoom-js-fft](https://npmjs.org/package/aureoom-js-fft) __11s__
+* [stft](https://npmjs.org/package/stft) __1.5s__
 * [frequencyjs](https://npmjs.org/package/frequencyjs)
-	* dft 730s
-	* fft 1.088s
+	* dft __730s__
+	* fft __1.088s__
 * [fourier](https://npmjs.org/package/fourier)
-	* fft 0.375s
-	* dft 96s
-	* ditRadix2 0.315s
-	* ditRadix2Simple 0.731s
-	* fft-32-raw 0.29s
-	* fft-32-asm 0.38s
+	* fft __0.375s__
+	* dft __96s__
+	* ditRadix2 __0.315s__
+	* ditRadix2Simple __0.731s__
+	* fft-32-raw __0.29s__
+	* fft-32-asm __0.38s__

@@ -8,6 +8,7 @@ var test = require('tst');
 var N = 4096;
 var real = new Float32Array(N);
 var im = new Float32Array(N);
+var rate = 44100;
 
 for (var i = 0; i < N; i++) {
 	// real[i] = Math.sin(2000 * (i / N) / (Math.PI * 2) )/3
@@ -18,7 +19,36 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
-test.only('fft-js', function () {
+test.only('digitalsignals', function () {
+	var dsp = require('digitalsignals');
+
+	var fft = new dsp.FFT(N, rate);
+	test('fft', function () {
+		for (var i = 0; i < max; i++) {
+			fft.forward(real);
+			fft.spectrum;
+		}
+	});
+
+	var rfft = new dsp.RFFT(N, rate);
+	test('rfft', function () {
+		for (var i = 0; i < max; i++) {
+			rfft.forward(real);
+			rfft.spectrum;
+		}
+	});
+
+	var dft = new dsp.DFT(N, rate);
+	test('dft 100×', function () {
+		for (var i = 0; i < max/100; i++) {
+			dft.forward(real);
+			dft.spectrum;
+		}
+	});
+});
+
+
+test('fft-js', function () {
 	var fftjs = require('fft-js');
 
 	var fft = fftjs.fft;
