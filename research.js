@@ -19,7 +19,47 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
-test.only('digitalsignals', function () {
+test('', function () {
+
+});
+
+
+test('dsp.js', function () {
+	var dsp = require('dsp.js');
+
+	var fft = new dsp.FFT(N, rate);
+	test('fft', function () {
+		for (var i = 0; i < max; i++) {
+			fft.forward(real);
+			fft.spectrum;
+		}
+	});
+
+	var rfft = new dsp.RFFT(N, rate);
+	test('rfft', function () {
+		for (var i = 0; i < max; i++) {
+			rfft.forward(real);
+			rfft.spectrum;
+		}
+	});
+
+	var dft = new dsp.DFT(N, rate);
+	test('dft 100×', function () {
+		for (var i = 0; i < max/100; i++) {
+			dft.forward(real);
+			dft.spectrum;
+		}
+	});
+});
+
+
+test.skip('dspjs', function () {
+	var dsp = require('dspjs');
+	console.log(dsp)
+});
+
+
+test('digitalsignals', function () {
 	var dsp = require('digitalsignals');
 
 	var fft = new dsp.FFT(N, rate);

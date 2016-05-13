@@ -4,7 +4,12 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 
 Packages are just npm-searched by keywords `fourier` and `fft`.
 
-* [digitalsignals](https://www.npmjs.com/package/digitalsignals) — fork of dsp.js, nothing changed in code
+* [corbanbrook/dsp.js](https://github.com/corbanbrook/dsp.js)
+	* fft __0.222s__
+	* rfft (real-values only FFT) __0.098s__
+	* dft __160s__
+* [dspjs](https://www.npmjs.com/package/dspjs) — incredibly weird fork of dsp.js with no `module.exports`. How are we supposed to use it?
+* [digitalsignals](https://www.npmjs.com/package/digitalsignals) — old fork of dsp.js
 	* fft __0.321s__
 	* rfft (real-values only FFT) __0.139s__
 	* dft __150s__
