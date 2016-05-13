@@ -1,12 +1,12 @@
 # Fourier transform packages comparison
 
-Tired of looking for fourier transform package? Here is benchmark of known to npm fourier transform packages.
+Tired of looking for fourier transform package? Here is a benchmark of known fourier transform packages.
 
-The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes sense) in node6. Probably should compare in various browsers as well (TODO).
+The task is to process waveform of 4096 real/imaginary numbers 1000 times. Results show total time taken in my laptop (lenovo x220 if it makes sense) in node6.
 
-Packages are just npm-searched by keywords `fourier` and `fft`.
+Packages are npm-searched by keywords `fourier`, `fft` and alike.
 
-* []()
+* [fili](https://www.npmjs.com/package/fili) __8s__
 * [ml-fft](https://www.npmjs.com/package/ml-fft) __0.32s__
 * [ndarray-fft](https://www.npmjs.com/package/ndarray-fft) __0.37s__
 * [fft](https://www.npmjs.com/package/fft) __4s__
@@ -38,5 +38,7 @@ Packages are just npm-searched by keywords `fourier` and `fft`.
 	* fft-32-raw __0.29s__
 	* fft-32-asm __0.38s__
 
-PS. Results are not verified, examples are based on packages’ readme/tests.
-PPS. Results are opinionated single-run measurements, if you don’t believe - run for yourself: clone repo, do `npm install` and `npm test`.
+**PS.** Correctness of transforms is not verified, we trust developers in that sense.
+**PPS.** Results are opinionated single-run measurements, so there are deviations, but relative performance is demonstrative.
+**PPPS.** I did not do any research of options of these packages, just used default settings. Quite possibly some packages use windowing, table creation or other pre-calculation which affects performance and can be disabled.
+**PPPPS.** If you feel like running benchmark for yourself or contributing: clone repo, do `npm install` and `npm test`. I was unable to compile [dsp](https://npmjs.org/package/dsp), [node-fft](https://npmjs.org/package/fft), [kissfft](https://npmjs.org/package/kissfft), you are welcome to contribute.

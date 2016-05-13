@@ -37,6 +37,7 @@
     "dspjs": "^1.0.0",
     "fft": "^0.2.1",
     "fft-js": "0.0.9",
+    "fili": "^1.2.1",
     "fourier": "^0.1.2",
     "frequencyjs": "0.0.4",
     "gl-shader-output": "^2.0.1",

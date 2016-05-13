@@ -19,6 +19,21 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
+
+test('fili', function () {
+	var Fili = require('fili');
+	var fft = new Fili.Fft(N);
+
+	test('run × 100', function () {
+		for (var i = 0; i < max/100; i++) {
+			var fftResult = fft.forward(real, 'hanning');
+		}
+	});
+});
+
+//TODO: does not compile
+test('dsp');
+
 test('ml-fft', function () {
 	var lib = require("ml-fft");
 	var FFT = lib.FFT;
@@ -32,8 +47,10 @@ test('ml-fft', function () {
 	});
 });
 
+//TODO: does not compile
 test.skip('kissfft');
 
+//TODO: does not compile
 test.skip('node-fft');
 
 test('ndarray-fft', function () {
