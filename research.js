@@ -18,8 +18,29 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
-test(, function () {
+test.only('fft-js', function () {
+	var fftjs = require('fft-js');
 
+	var fft = fftjs.fft;
+	test('fft 100 ×', function () {
+		for (var i = 0; i < max/100; i++) {
+			fft(real);
+		}
+	});
+
+	var fftInPlace = fftjs.fftInPlace;
+	test('fft-in-place 100 ×', function () {
+		for (var i = 0; i < max/100; i++) {
+			fftInPlace(real);
+		}
+	});
+
+	var dft = fftjs.dft;
+	test.skip('dft ' + max + ' ×', function () {
+		// for (var i = 0; i < max; i++) {
+			dft(real);
+		// }
+	});
 });
 
 

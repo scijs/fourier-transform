@@ -4,6 +4,10 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 
 Packages are just npm-searched by keywords `fourier` and `fft`.
 
+* [fft-js](https://npmjs.org/package/fft-js)
+	* fft 39.4s
+	* fftInPlace 120s
+	* dft ∞s (I waited like for a couple of mins for single run and then bored)
 * [aureoom-js-fft](https://npmjs.org/package/aureoom-js-fft) 11s
 * [stft](https://npmjs.org/package/stft) 1.5s
 * [frequencyjs](https://npmjs.org/package/frequencyjs)

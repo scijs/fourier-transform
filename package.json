@@ -31,6 +31,7 @@
     "aureooms-js-fft": "^1.0.1",
     "aureooms-js-number": "^2.1.0",
     "aureooms-js-random": "^1.0.2",
+    "fft-js": "0.0.9",
     "fourier": "^0.1.2",
     "frequencyjs": "0.0.4",
     "stft": "0.0.0"
