@@ -19,9 +19,16 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
-test('', function () {
-
+if (typeof document !== 'undefined') {
+test('webgl dft', function () {
+	var dft = require('./dft')(N, real);
+	test('run 10 ×', function () {
+		for (var i = 0; i < max/10; i++) {
+			dft();
+		}
+	});
 });
+}
 
 
 test('dsp.js', function () {
