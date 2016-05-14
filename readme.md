@@ -1,4 +1,4 @@
-Simple, minimalistic and efficient FFT implementation based off [fourier packages research](./benchmark.md). [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges).
+Minimalistic and efficient FFT implementation based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/). Exhibits highest performance in [fourier packages benchmark](./benchmark.md). [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges).
 
 ## Usage
 
@@ -7,44 +7,9 @@ Simple, minimalistic and efficient FFT implementation based off [fourier package
 ```js
 var ft = require('fourier-transform');
 
-var frequencies = ft(waveform);
-```
-
-## API
-
-### `rfft(real, output?)`
-
-Real values fourier transform, exhibits highest performance. Based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/). Used as a default package output and expected to cover the most common use-case.
-
-```js
-var fft = require('fourier-transform/rfft');
-
 var waveform = new Float64Array(1024);
 
-var frequencies = fft(waveform);
-```
-
-### `fft(real, imag, output?)`
-
-Radix FFT implementation, based on [dsp.js FFT.forward](https://github.com/corbanbrook/dsp.js/). Takes real and imaginary values as input and returns output. If an output array passed, it will be populated with frequencies data. Performance is about twice slower than rfft.
-
-```js
-var fft = require('fourier-transform/fft');
-
-var real = new Float64Array(1024);
-var im = new Float64Array(1024);
-
-var frequencies = fft(real, im);
-```
-
-### `ifft(frequencies, output?)`
-
-Inverse FFT implementation, based off [dsp.js FFT.inverse](https://github.com/corbanbrook/dsp.js/). Useful for resynthesis.
-
-```js
-var ifft = require('fourier-transform/ifft');
-
-var waveform = ifft(frequencies);
+var frequencies = ft(waveform);
 ```
 
 ## Thanks

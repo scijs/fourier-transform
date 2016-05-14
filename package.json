@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node test.js",
+    "test:browser": "budo test.js",
     "benchmark": "node benchmark.js"
   },
   "repository": {
