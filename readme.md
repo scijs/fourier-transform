@@ -1,4 +1,6 @@
-Minimalistic and efficient FFT implementation. [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+Minimalistic and efficient FFT implementation.
+
+[![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
 
 [![npm install fourier-transform](https://nodei.co/npm/fourier-transform.png?mini=true)](https://npmjs.org/package/fourier-transform/)
 
@@ -6,8 +8,7 @@ Minimalistic and efficient FFT implementation. [![stable](http://badges.github.i
 var ft = require('fourier-transform');
 
 var waveform = new Float64Array(1024);
-
-var frequencies = ft(waveform);
+var spectrum = ft(waveform);
 ```
 
 ## Thanks
