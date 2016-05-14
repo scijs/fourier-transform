@@ -14,25 +14,25 @@ var frequencies = ft(waveform);
 
 ### `rfft(real, output?)`
 
-Real values fourier transform, exhibits highest performance. Based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [FXT](http://www.jjj.de/fxt/). Used as a default package output and expected to cover the most common use-case.
+Real values fourier transform, exhibits highest performance. Based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/). Used as a default package output and expected to cover the most common use-case.
 
 ```js
 var fft = require('fourier-transform/rfft');
 
-var waveform = new Float32Array(1024);
+var waveform = new Float64Array(1024);
 
 var frequencies = fft(waveform);
 ```
 
-### `fft(real, imaginary, output?)`
+### `fft(real, imag, output?)`
 
-Common radix FFT implementation, based on [dsp.js FFT.forward](https://github.com/corbanbrook/dsp.js/). Takes real and imaginary values as input and returns output. If an output array passed, it will be populated with frequencies data.
+Radix FFT implementation, based on [dsp.js FFT.forward](https://github.com/corbanbrook/dsp.js/). Takes real and imaginary values as input and returns output. If an output array passed, it will be populated with frequencies data. Performance is about twice slower than rfft.
 
 ```js
 var fft = require('fourier-transform/fft');
 
-var real = new Float32Array(1024);
-var im = new Float32Array(1024);
+var real = new Float64Array(1024);
+var im = new Float64Array(1024);
 
 var frequencies = fft(real, im);
 ```
