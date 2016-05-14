@@ -7,7 +7,15 @@ Minimalistic and efficient FFT implementation.
 ```js
 var ft = require('fourier-transform');
 
-var waveform = new Float64Array(1024);
+var frequency = 440;
+var blockSize = 1024;
+var sampleRate = 44100;
+var waveform = new Float64Array(blockSize);
+for (var i = 0; i < blockSize; i++) {
+	waveform[i] = Math.sin(frequency * Math.PI * 2 * (i / sampleRate));
+}
+
+//get frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
 var spectrum = ft(waveform);
 ```
 
