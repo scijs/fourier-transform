@@ -1,6 +1,6 @@
-Minimalistic and efficient FFT implementation based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/). Exhibits highest performance in [fourier packages benchmark](./benchmark.md). [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges).
+Minimalistic and efficient FFT implementation.
 
-## Usage
+[![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges).
 
 [![npm install fourier-transform](https://nodei.co/npm/fourier-transform.png?mini=true)](https://npmjs.org/package/fourier-transform/)
 
@@ -14,8 +14,7 @@ var frequencies = ft(waveform);
 
 ## Thanks
 
-To all the [existing fft packages](./benchmark.md), without them this one would not be possible. Special thanks to @corbanbrook for the most efficient implementation in [dsp.js](https://github.com/corbanbrook/dsp.js).
-
+To all the [existing fft packages](./benchmark.md), without them this one would not be possible. Special thanks to @corbanbrook for the most efficient implementation in [dsp.js](https://github.com/corbanbrook/dsp.js). This package is based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/).
 
 ## Contribute
 
@@ -23,6 +22,7 @@ If you find it slow, difficult or broken, please [post an issue](./issues). If y
 
 ## Related
 
+* [fourier transforms benchmark](./benchmark.md).
 * [gl-fourier](https://github.com/dfcreative/gl-fourier) WebGL fourier transform implementations.
 * [gl-spectrum](https://github.com/dfcreative/gl-spectrum) render spectrum in 2d/3d canvas.
 * [audio-spectrum](https://github.com/audio-lab/audio-spectrum) render spectrum of a stream in node/browser.
