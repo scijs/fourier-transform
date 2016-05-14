@@ -1,5 +1,5 @@
 /**
- * DFT in webgl
+ * DFT with webgl
  */
 var createShader = require('gl-shader-output');
 
