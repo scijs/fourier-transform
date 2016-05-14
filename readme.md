@@ -8,10 +8,10 @@ Minimalistic and efficient FFT implementation.
 var ft = require('fourier-transform');
 
 var frequency = 440;
-var blockSize = 1024;
+var size = 1024;
 var sampleRate = 44100;
-var waveform = new Float64Array(blockSize);
-for (var i = 0; i < blockSize; i++) {
+var waveform = new Float32Array(size);
+for (var i = 0; i < size; i++) {
 	waveform[i] = Math.sin(frequency * Math.PI * 2 * (i / sampleRate));
 }
 
