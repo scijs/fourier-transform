@@ -14,11 +14,11 @@ module.exports = function rfft (input, spectrum) {
 
 	if (Math.pow(2, k) !== N) throw Error("Invalid array size, must be a power of 2.");
 
-	if (!spectrum) spectrum = new Float64Array(N/2);
+	if (!spectrum) spectrum = new Array(N/2);
 
 	//.forward call
 	var n         = N,
-		x         = new Float64Array(N),
+		x         = new Array(N),
 		TWO_PI    = 2*Math.PI,
 		sqrt      = Math.sqrt,
 		i         = n >>> 1,

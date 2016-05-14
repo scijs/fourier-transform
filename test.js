@@ -46,3 +46,10 @@ test('rfft', function () {
 
 	assert.almost(rfft(real), fft.spectrum);
 });
+
+test('performance', function () {
+	var data = new Float64Array(4096);
+	for (var i = 0; i < 1000; i++) {
+		rfft(data);
+	}
+});
