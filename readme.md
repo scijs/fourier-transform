@@ -17,7 +17,7 @@ To all the [existing fft packages](./benchmark.md), without them this one would 
 
 ## Contribute
 
-If you find it slow, difficult or broken, please [post an issue](./issues). If you have ideas or know-hows for better implementation - [PR’s are welcome](./pull-request).
+If you find it slow, difficult or broken, please [post an issue](https://github.com/dfcreative/fourier-transform/issues). If you have ideas or know-hows for better implementation - [PR’s are welcome](https://github.com/dfcreative/fourier-transform/pulls).
 
 ## Related
 
