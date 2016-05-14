@@ -22,7 +22,6 @@ If you find it slow, difficult or broken, please [post an issue](https://github.
 ## Related
 
 * [fourier transforms benchmark](./benchmark.md).
+* [ndarray-fft](https://github.com/scijs/ndarray-fft) FFT for ndarrays.
 * [gl-fourier](https://github.com/dfcreative/gl-fourier) WebGL fourier transform implementations.
 * [gl-spectrum](https://github.com/dfcreative/gl-spectrum) render spectrum in 2d/3d canvas.
-* [audio-spectrum](https://github.com/audio-lab/audio-spectrum) render spectrum of a stream in node/browser.
-* [audio-spectrogram](https://github.com/audio-lab/audio-spectrogram) render spectrogram of a stream in node/browser.
