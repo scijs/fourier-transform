@@ -1,6 +1,6 @@
 {
   "name": "fourier-transform",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimalistic and efficient FFT implementation",
   "main": "index.js",
   "scripts": {
