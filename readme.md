@@ -15,7 +15,7 @@ for (var i = 0; i < size; i++) {
 	waveform[i] = Math.sin(frequency * Math.PI * 2 * (i / sampleRate));
 }
 
-//get frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
+//get normalized magnitudes for frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
 var spectrum = ft(waveform);
 ```
 
