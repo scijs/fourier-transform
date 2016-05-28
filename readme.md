@@ -6,6 +6,7 @@ Minimalistic and efficient FFT implementation.
 
 ```js
 var ft = require('fourier-transform');
+var db = require('decibels');
 
 var frequency = 440;
 var size = 1024;
@@ -17,6 +18,9 @@ for (var i = 0; i < size; i++) {
 
 //get normalized magnitudes for frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
 var spectrum = ft(waveform);
+
+//convert to decibels
+var decibels = spectrum.map((value) => db.fromGain(value))
 ```
 
 ## Thanks
