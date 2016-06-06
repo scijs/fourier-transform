@@ -34,6 +34,6 @@ If you find it slow, difficult or broken, please [post an issue](https://github.
 ## Related
 
 * [fourier transforms benchmark](./benchmark.md).
-* [ndarray-fft](https://github.com/scijs/ndarray-fft) FFT for ndarrays.
+* [ndarray-fft](https://github.com/scijs/ndarray-fft) FFT for ndarrays, allowing not-power-of-two inputs.
 * [gl-fourier](https://github.com/dfcreative/gl-fourier) WebGL fourier transform implementations.
 * [gl-spectrum](https://github.com/dfcreative/gl-spectrum) render spectrum in 2d/3d canvas.
