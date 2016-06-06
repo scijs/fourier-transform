@@ -1,4 +1,4 @@
-Minimalistic and efficient FFT implementation.
+Minimalistic and efficient FFT implementation for 2<sup>n</sup>-size input sequences.
 
 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
 
