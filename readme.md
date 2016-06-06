@@ -1,6 +1,6 @@
-Minimalistic and efficient FFT implementation for 2<sup>n</sup>-size input sequences.
+# fourier-transform [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
 
-[![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+Minimalistic and efficient FFT implementation for 2<sup>n</sup>-size input sequences.
 
 [![npm install fourier-transform](https://nodei.co/npm/fourier-transform.png?mini=true)](https://npmjs.org/package/fourier-transform/)
 
