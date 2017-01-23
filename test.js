@@ -6,8 +6,7 @@ var dsp = require('dsp.js');
 var ndfft = require('ndarray-fft');
 var ndarray = require('ndarray');
 
-
-var N = 4096/32;
+var N = 4096/4;
 var real = new Float32Array(N);
 var im = new Float32Array(N);
 
@@ -54,12 +53,22 @@ test('rfft', function () {
 	var x = ndarray(real);
 	var y = ndarray(im);
 	ndfft(1, x, y);
+	var mag3 = new Array();
+	for (var i = x.shape[0]/2; i < x.shape[0]; i++) {
+		var rv = x.get(i), iv = y.get(i);
+		mag3.push(Math.sqrt(rv*rv + iv*iv))
+	}
+	normalize(mag3)
+	draw(mag1)
+	draw(mag2)
+	draw(mag3)
 
 
 	for (let i = 0; i < mag1.length; i++) {
 		let v1 = mag1[i]
 		let v2 = mag2[i]
-		if (Math.abs(v1 - v2) > 1e-2) console.log(v1, v2, i)
+		let v3 = mag3[i]
+		// if (Math.abs(v1 - v2) > 1e-2) console.log(v1, v2, i)
 	}
 
 	assert.almost(mag1, mag2);
@@ -71,3 +80,45 @@ test.skip('performance', function () {
 		rfft(data);
 	}
 });
+
+
+
+function draw (arr) {
+	let canvas = document.body.appendChild(document.createElement('canvas'));
+	let ctx = canvas.getContext('2d')
+	canvas.style.cssText = `
+		margin: 5px;
+		display: block;
+		outline: 1px solid rgba(255,240,230,1);
+	`
+
+	let w = canvas.width;
+	let h = canvas.height;
+
+	ctx.beginPath();
+	for (let i = 0, len = arr.length; i < len; i++) {
+		let r = i/len;
+		ctx.lineTo(r*w, h - h*arr[i]);
+	}
+
+	ctx.stroke();
+	ctx.closePath();
+}
+
+
+
+function normalize (arr) {
+	let max = -999;
+	let min = 999;
+
+	for (let i = 0, l = arr.length; i < l; i++) {
+		max = Math.max(arr[i], max);
+		min = Math.min(arr[i], min);
+	}
+
+	for (let i = 0, l = arr.length; i < l; i++) {
+		arr[i] = (arr[i] - min) / (max - min)
+	}
+
+	return arr;
+}

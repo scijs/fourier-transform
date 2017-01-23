@@ -31,6 +31,7 @@
     "aureooms-js-fft": "^1.0.1",
     "aureooms-js-number": "^2.1.0",
     "aureooms-js-random": "^1.0.2",
+    "cwise": "^1.0.9",
     "digitalsignals": "^1.0.0",
     "dsp-fft": "0.0.0-semantically-released",
     "dsp.js": "github:corbanbrook/dsp.js",
@@ -40,12 +41,12 @@
     "fili": "^1.2.1",
     "fourier": "^0.1.2",
     "frequencyjs": "0.0.4",
+    "gl-shader-output": "^2.0.1",
     "ml-fft": "^1.0.5",
     "ndarray": "^1.0.18",
     "ndarray-fft": "^1.0.2",
     "regl": "^0.4.0",
     "stft": "0.0.0",
-    "tst": "^1.3.1",
-    "gl-shader-output": "^2.0.1"
+    "tst": "^1.3.1"
   }
 }
