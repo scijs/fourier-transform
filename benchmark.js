@@ -22,8 +22,8 @@ var max = 10e2;
 test('fft-asm', function () {
 	var FftModule = require('./lib/fft-asm')
 
-	fftasm= new FftModule(N, true);
-	fftnoasm= new FftModule(N, false);
+	fftasm= new FftModule(N/2, true);
+	fftnoasm= new FftModule(N/2, false);
 
 	test('asm run', function () {
 		for (var i = 0; i < max; i++) {
