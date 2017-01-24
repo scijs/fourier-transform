@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node test.js",
-    "test:browser": "budo test.js",
-    "benchmark": "node benchmark.js"
+    "test:browser": "budo --open test.js",
+    "benchmark": "node benchmark/run.js"
   },
   "repository": {
     "type": "git",
@@ -46,6 +46,8 @@
     "regl": "^0.4.0",
     "stft": "0.0.0",
     "tst": "^1.3.1",
-    "gl-shader-output": "^2.0.1"
+    "gl-shader-output": "^2.0.1",
+    "benchmark": "^2.1.3",
+    "microtime": "^2.1.2"
   }
 }
