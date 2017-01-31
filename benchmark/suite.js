@@ -267,4 +267,19 @@ module.exports = function (setup, run) {
       fourier.custom.heap2array(new Float32Array(heap), _imag, N, N);
     });
   });
+
+  setup('fft-asm', function () {
+    var FftModule = require('./../lib/fft-asm')
+
+    var fftasm = new FftModule(N / 2, true);
+    var fftnoasm = new FftModule(N / 2, false);
+
+    run('asm run', function () {
+      fftasm.fftmag(real, im);
+    });
+
+    run('noasm run', function () {
+      fftnoasm.fftmag(real, im);
+    });
+  })
 }

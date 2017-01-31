@@ -19,16 +19,37 @@ for (var i = 0; i < N; i++) {
 var max = 10e2;
 
 
+test('fft-asm', function () {
+	var FftModule = require('./lib/fft-asm')
 
-test('fili', function () {
-	var Fili = require('fili');
-	var fft = new Fili.Fft(N);
+	fftasm= new FftModule(N/2, true);
+	fftnoasm= new FftModule(N/2, false);
 
-	test('run × 100', function () {
-		for (var i = 0; i < max/100; i++) {
-			var fftResult = fft.forward(real, 'hanning');
+	test('asm run', function () {
+		for (var i = 0; i < max; i++) {
+			fftasm.fftmag(real, im);
 		}
 	});
+
+
+	test('noasm run', function () {
+		for (var i = 0; i < max; i++) {
+			fftnoasm.fftmag(real, im);
+		}
+	});
+
+});
+
+
+test.skip('fili', function () {
+	// var Fili = require('fili');
+	// var fft = new Fili.Fft(N);
+
+	// test('run × 100', function () {
+	// 	for (var i = 0; i < max/100; i++) {
+	// 		var fftResult = fft.forward(real, 'hanning');
+	// 	}
+	// });
 });
 
 //TODO: does not compile
@@ -87,13 +108,13 @@ test('dsp-fft', function () {
 
 
 if (typeof document !== 'undefined') {
-test('webgl dft', function () {
-	var dft = require('./dft')(N, real);
-	test('run 10 ×', function () {
-		for (var i = 0; i < max/10; i++) {
-			dft();
-		}
-	});
+test.skip('webgl dft', function () {
+	// var dft = require('./dft')(N, real);
+	// test('run 10 ×', function () {
+	// 	for (var i = 0; i < max/10; i++) {
+	// 		dft();
+	// 	}
+	// });
 });
 }
 
