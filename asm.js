@@ -5,6 +5,7 @@
  *
  */
 
+'use strict'
 
 module.exports = rfft
 

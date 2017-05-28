@@ -4,6 +4,7 @@
  * @module  fourier-transform
  *
  */
+'use strict'
 
 module.exports = function rfft (input, spectrum) {
 	if (!input) throw Error("Input waveform is not provided, pass input array.")
