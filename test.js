@@ -8,7 +8,6 @@ var rfftAsm = require('./asm')
 var dsp = require('dsp.js')
 var ndfft = require('ndarray-fft')
 var ndarray = require('ndarray')
-var isBrowser = require('is-browser')
 
 var isBrowser = typeof document !== 'undefined'
 
@@ -129,7 +128,7 @@ if (isBrowser) {
     ctx.stroke();
     ctx.closePath();
   }
-
+}
 
 function normalize (arr) {
 	var max = -999;
