@@ -1,3 +1,5 @@
+'use strict'
+
 var test = require('tape')
 var assert = require('assert')
 var almost = require('almost-equal')
