@@ -65,11 +65,12 @@ function FFT(stdlib, foreign, heap) {
 			n2 = 0, n4 = 0, n8 = 0, nn = 0,
 			t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0,
 			i1 = 0, i2 = 0, i3 = 0, i4 = 0, i5 = 0, i6 = 0, i7 = 0, i8 = 0,
+			p1 = 0, p2 = 0, p3 = 0, p4 = 0, p5 = 0, p6 = 0, p7 = 0, p8 = 0,
 			st1 = 0.0, cc1 = 0.0, ss1 = 0.0, cc3 = 0.0, ss3 = 0.0,
 			e = 0.0,
 			a = 0.0,
 			rval = 0.0, ival = 0.0, mag = 0.0
-        var ix = 0, i0 = 0, id = 0
+        var ix = 0, i0 = 0, id = 0, p0 = 0
 
         i = n >>> 1
         bSi = 2.0 / +(n|0)
@@ -79,9 +80,11 @@ function FFT(stdlib, foreign, heap) {
 		for (ix = 0, id = 4; (ix|0) < (n|0); id = imul(id, 4)) {
 			for (i0 = ix; (i0|0) < (n|0); i0 = i0 + id|0) {
 				//sumdiff(x[i0], x[i0+1]) // {a, b}  <--| {a+b, a-b}
-				st1 = x[i0 << 3 >> 3] - x[i0+1 << 3 >> 3]
-				x[i0 << 3 >> 3] = x[i0 << 3 >> 3] + x[i0+1 << 3 >> 3]
-				x[i0+1 << 3 >> 3] = st1
+				p0 = i0 << 3
+				p1 = i0+1 << 3
+				st1 = x[p0 >> 3] - x[p1 >> 3]
+				x[p0 >> 3] = x[p0 >> 3] + x[p1 >> 3]
+				x[p1 >> 3] = st1
 			}
 			ix = imul(2, (id-1))
 		}
@@ -102,34 +105,42 @@ function FFT(stdlib, foreign, heap) {
 						i2 = i1 + n4|0
 						i3 = i2 + n4|0
 						i4 = i3 + n4|0
+						p1 = i1 << 3
+						p2 = i2 << 3
+						p3 = i3 << 3
+						p4 = i4 << 3
 
 						//diffsum3_r(x[i3], x[i4], t1) // {a, b, s} <--| {a, b-a, a+b}
-						t1 = x[i3 << 3 >> 3] + x[i4 << 3 >> 3]
-						x[i4 << 3 >> 3] = x[i4 << 3 >> 3] - x[i3 << 3 >> 3]
+						t1 = x[p3 >> 3] + x[p4 >> 3]
+						x[p4 >> 3] = x[p4 >> 3] - x[p3 >> 3]
 						//sumdiff3(x[i1], t1, x[i3])   // {a, b, d} <--| {a+b, b, a-b}
-						x[i3 << 3 >> 3] = x[i1 << 3 >> 3] - t1
-						x[i1 << 3 >> 3] = x[i1 << 3 >> 3] + t1
+						x[p3 >> 3] = x[p1 >> 3] - t1
+						x[p1 >> 3] = x[p1 >> 3] + t1
 
 						i1 = i1 + n8|0
 						i2 = i2 + n8|0
 						i3 = i3 + n8|0
 						i4 = i4 + n8|0
+						p1 = i1 << 3
+						p2 = i2 << 3
+						p3 = i3 << 3
+						p4 = i4 << 3
 
 						//sumdiff(x[i3], x[i4], t1, t2) // {s, d}  <--| {a+b, a-b}
-						t1 = x[i3 << 3 >> 3] + x[i4 << 3 >> 3]
-						t2 = x[i3 << 3 >> 3] - x[i4 << 3 >> 3]
+						t1 = x[p3 >> 3] + x[p4 >> 3]
+						t2 = x[p3 >> 3] - x[p4 >> 3]
 
 						t1 = -t1 * SQRT1_2
 						t2 = t2 * SQRT1_2
 
 						// sumdiff(t1, x[i2], x[i4], x[i3]) // {s, d}  <--| {a+b, a-b}
-						st1 = +(x[i2 << 3 >> 3])
-						x[i4 << 3 >> 3] = t1 + st1
-						x[i3 << 3 >> 3] = t1 - st1
+						st1 = +(x[p2 >> 3])
+						x[p4 >> 3] = t1 + st1
+						x[p3 >> 3] = t1 - st1
 
 						//sumdiff3(x[i1], t2, x[i2]) // {a, b, d} <--| {a+b, b, a-b}
-						x[i2 << 3 >> 3] = x[i1 << 3 >> 3] - t2
-						x[i1 << 3 >> 3] = x[i1 << 3 >> 3] + t2
+						x[p2 >> 3] = x[p1 >> 3] - t2
+						x[p1 >> 3] = x[p1 >> 3] + t2
 					}
 				} else {
 					for(i0 = ix; (i0|0) < (n|0); i0 = i0 + id|0) {
@@ -137,14 +148,18 @@ function FFT(stdlib, foreign, heap) {
 						i2 = i1 + n4|0
 						i3 = i2 + n4|0
 						i4 = i3 + n4|0
+						p1 = i1 << 3
+						p2 = i2 << 3
+						p3 = i3 << 3
+						p4 = i4 << 3
 
 						//diffsum3_r(x[i3], x[i4], t1) // {a, b, s} <--| {a, b-a, a+b}
-						t1 = x[i3 << 3 >> 3] + x[i4 << 3 >> 3]
-						x[i4 << 3 >> 3] = x[i4 << 3 >> 3] - x[i3 << 3 >> 3]
+						t1 = x[p3 >> 3] + x[p4 >> 3]
+						x[p4 >> 3] = x[p4 >> 3] - x[p3 >> 3]
 
 						//sumdiff3(x[i1], t1, x[i3])   // {a, b, d} <--| {a+b, b, a-b}
-						x[i3 << 3 >> 3] = x[i1 << 3 >> 3] - t1
-						x[i1 << 3 >> 3] = x[i1 << 3 >> 3] + t1
+						x[p3 >> 3] = x[p1 >> 3] - t1
+						x[p1 >> 3] = x[p1 >> 3] + t1
 					}
 				}
 
@@ -176,14 +191,23 @@ function FFT(stdlib, foreign, heap) {
 						i7 = i6 + n4|0
 						i8 = i7 + n4|0
 
+						p1 = i1 << 3
+						p2 = i2 << 3
+						p3 = i3 << 3
+						p4 = i4 << 3
+						p5 = i5 << 3
+						p6 = i6 << 3
+						p7 = i7 << 3
+						p8 = i8 << 3
+
 						//cmult(c, s, x, y, &u, &v)
 						//cmult(cc1, ss1, x[i7], x[i3], t2, t1) // {u,v} <--| {x*c-y*s, x*s+y*c}
-						t2 = x[i7 << 3 >> 3]*cc1 - x[i3 << 3 >> 3]*ss1
-						t1 = x[i7 << 3 >> 3]*ss1 + x[i3 << 3 >> 3]*cc1
+						t2 = x[p7 >> 3]*cc1 - x[p3 >> 3]*ss1
+						t1 = x[p7 >> 3]*ss1 + x[p3 >> 3]*cc1
 
 						//cmult(cc3, ss3, x[i8], x[i4], t4, t3)
-						t4 = x[i8 << 3 >> 3]*cc3 - x[i4 << 3 >> 3]*ss3
-						t3 = x[i8 << 3 >> 3]*ss3 + x[i4 << 3 >> 3]*cc3
+						t4 = x[p8 >> 3]*cc3 - x[p4 >> 3]*ss3
+						t3 = x[p8 >> 3]*ss3 + x[p4 >> 3]*cc3
 
 						//sumdiff(t2, t4)   // {a, b} <--| {a+b, a-b}
 						st1 = t2 - t4
@@ -192,8 +216,8 @@ function FFT(stdlib, foreign, heap) {
 
 						//sumdiff(t2, x[i6], x[i8], x[i3]) // {s, d}  <--| {a+b, a-b}
 						//st1 = x[i6] x[i8] = t2 + st1 x[i3] = t2 - st1
-						x[i8 << 3 >> 3] = t2 + x[i6 << 3 >> 3]
-						x[i3 << 3 >> 3] = t2 - x[i6 << 3 >> 3]
+						x[p8 >> 3] = t2 + x[p6 >> 3]
+						x[p3 >> 3] = t2 - x[p6 >> 3]
 
 						//sumdiff_r(t1, t3) // {a, b} <--| {a+b, b-a}
 						st1 = t3 - t1
@@ -202,16 +226,16 @@ function FFT(stdlib, foreign, heap) {
 
 						//sumdiff(t3, x[i2], x[i4], x[i7]) // {s, d}  <--| {a+b, a-b}
 						//st1 = x[i2] x[i4] = t3 + st1 x[i7] = t3 - st1
-						x[i4 << 3 >> 3] = t3 + x[i2 << 3 >> 3]
-						x[i7 << 3 >> 3] = t3 - x[i2 << 3 >> 3]
+						x[p4 >> 3] = t3 + x[p2 >> 3]
+						x[p7 >> 3] = t3 - x[p2 >> 3]
 
 						//sumdiff3(x[i1], t1, x[i6])   // {a, b, d} <--| {a+b, b, a-b}
-						x[i6 << 3 >> 3] = x[i1 << 3 >> 3] - t1
-						x[i1 << 3 >> 3] = x[i1 << 3 >> 3] + t1
+						x[p6 >> 3] = x[p1 >> 3] - t1
+						x[p1 >> 3] = x[p1 >> 3] + t1
 
 						//diffsum3_r(t4, x[i5], x[i2]) // {a, b, s} <--| {a, b-a, a+b}
-						x[i2 << 3 >> 3] = t4 + x[i5 << 3 >> 3]
-						x[i5 << 3 >> 3] = x[i5 << 3 >> 3] - t4
+						x[p2 >> 3] = t4 + x[p5 >> 3]
+						x[p5 >> 3] = x[p5 >> 3] - t4
 					}
 
 					ix = (id << 1) - n2|0
@@ -228,7 +252,7 @@ function FFT(stdlib, foreign, heap) {
 			arr[output + i << 3 >> 3] = mag
 		}
 
-		arr[output + 0 << 3 >> 3] = abs(bSi * x[0 << 3 >> 3])
+		arr[output + 0 << 3 >> 3] = abs(bSi * x[0])
 	}
 
 
@@ -242,7 +266,7 @@ function FFT(stdlib, foreign, heap) {
 		halfSize = n >>> 1
 		nm1 = n - 1|0
 
-		x[0 << 3 >> 3] = arr[input + 0 << 3 >> 3]
+		x[0] = arr[input + 0 << 3 >> 3]
 
 		do {
 			r = r + halfSize|0

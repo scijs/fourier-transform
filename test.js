@@ -45,7 +45,7 @@ assert.almost = function (x, y) {
 };
 
 
-test.skip('rfft', function (t) {
+test('rfft', function (t) {
 	//RFFT direct transform
 	var mag1 = rfftAsm(real);
 
@@ -65,11 +65,9 @@ test.skip('rfft', function (t) {
 	}
 	normalize(mag3)
 
-  if (isBrowser) {
   	draw(mag1)
   	draw(mag2)
   	draw(mag3)
-  }
 
 	for (var i = 0; i < mag1.length; i++) {
 		var v1 = mag1[i]
@@ -106,28 +104,29 @@ test('performance', function (t) {
 });
 
 
-if (isBrowser) {
-  function draw (arr) {
-    let canvas = document.body.appendChild(document.createElement('canvas'));
-    let ctx = canvas.getContext('2d')
-    canvas.style.cssText = `
-    margin: 5px;
-    display: block;
-    outline: 1px solid rgba(255,240,230,1);
-    `
 
-    let w = canvas.width;
-    let h = canvas.height;
+function draw (arr) {
+	if (!isBrowser) return
 
-    ctx.beginPath();
-    for (let i = 0, len = arr.length; i < len; i++) {
-      let r = i/len;
-      ctx.lineTo(r*w, h - h*arr[i]);
-    }
+	let canvas = document.body.appendChild(document.createElement('canvas'));
+	let ctx = canvas.getContext('2d')
+	canvas.style.cssText = `
+	margin: 5px;
+	display: block;
+	outline: 1px solid rgba(255,240,230,1);
+	`
 
-    ctx.stroke();
-    ctx.closePath();
-  }
+	let w = canvas.width;
+	let h = canvas.height;
+
+	ctx.beginPath();
+	for (let i = 0, len = arr.length; i < len; i++) {
+	  let r = i/len;
+	  ctx.lineTo(r*w, h - h*arr[i]);
+	}
+
+	ctx.stroke();
+	ctx.closePath();
 }
 
 function normalize (arr) {
