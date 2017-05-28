@@ -42,22 +42,22 @@ function FFT(stdlib, foreign, heap) {
 	'use asm'
 
 	var TAU = 6.283185307179586
-    var sqrt = stdlib.Math.sqrt
-    var sin = stdlib.Math.sin
-    var cos = stdlib.Math.cos
-    var abs = stdlib.Math.abs
-    var SQRT1_2 = stdlib.Math.SQRT1_2
-    var imul = stdlib.Math.imul
+	var sqrt = stdlib.Math.sqrt
+	var sin = stdlib.Math.sin
+	var cos = stdlib.Math.cos
+	var abs = stdlib.Math.abs
+	var SQRT1_2 = stdlib.Math.SQRT1_2
+	var imul = stdlib.Math.imul
 
 	//memory layout is [x, input, output]
-    var arr = new stdlib.Float64Array(heap)
-    var x = new stdlib.Float64Array(heap)
+	var arr = new stdlib.Float64Array(heap)
+	var x = new stdlib.Float64Array(heap)
 	var input = 8192
 	var output = 16384
 
 	function rfft (n, k) {
-        n = n|0
-        k = k|0
+		n = n|0
+		k = k|0
 
 		//.forward call
 		var i         = 0, j = 0,
@@ -70,10 +70,10 @@ function FFT(stdlib, foreign, heap) {
 			e = 0.0,
 			a = 0.0,
 			rval = 0.0, ival = 0.0, mag = 0.0
-        var ix = 0, i0 = 0, id = 0, p0 = 0
+		var ix = 0, i0 = 0, id = 0, p0 = 0
 
-        i = n >>> 1
-        bSi = 2.0 / +(n|0)
+		i = n >>> 1
+		bSi = 2.0 / +(n|0)
 
 		reverseBinPermute(n)
 
@@ -257,7 +257,7 @@ function FFT(stdlib, foreign, heap) {
 
 
 	function reverseBinPermute (n) {
-        n = n|0
+		n = n|0
 
 		var halfSize    = 0,
 			nm1         = 0,
