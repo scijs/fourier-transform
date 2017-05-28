@@ -67,10 +67,10 @@ test.skip('rfft', function (t) {
 	draw(mag2)
 	draw(mag3)
 
-	for (let i = 0; i < mag1.length; i++) {
-		let v1 = mag1[i]
-		let v2 = mag2[i]
-		let v3 = mag3[i]
+	for (var i = 0; i < mag1.length; i++) {
+		var v1 = mag1[i]
+		var v2 = mag2[i]
+		var v3 = mag3[i]
 		// if (Math.abs(v1 - v2) > 1e-2) console.log(v1, v2, i)
 	}
 
@@ -106,20 +106,20 @@ test('performance', function (t) {
 function draw (arr) {
 	if (!isBrowser) return
 
-	let canvas = document.body.appendChild(document.createElement('canvas'));
-	let ctx = canvas.getContext('2d')
+	var canvas = document.body.appendChild(document.createElement('canvas'));
+	var ctx = canvas.getContext('2d')
 	canvas.style.cssText = `
 		margin: 5px;
 		display: block;
 		outline: 1px solid rgba(255,240,230,1);
 	`
 
-	let w = canvas.width;
-	let h = canvas.height;
+	var w = canvas.width;
+	var h = canvas.height;
 
 	ctx.beginPath();
-	for (let i = 0, len = arr.length; i < len; i++) {
-		let r = i/len;
+	for (var i = 0, len = arr.length; i < len; i++) {
+		var r = i/len;
 		ctx.lineTo(r*w, h - h*arr[i]);
 	}
 
@@ -130,15 +130,15 @@ function draw (arr) {
 
 
 function normalize (arr) {
-	let max = -999;
-	let min = 999;
+	var max = -999;
+	var min = 999;
 
-	for (let i = 0, l = arr.length; i < l; i++) {
+	for (var i = 0, l = arr.length; i < l; i++) {
 		max = Math.max(arr[i], max);
 		min = Math.min(arr[i], min);
 	}
 
-	for (let i = 0, l = arr.length; i < l; i++) {
+	for (var i = 0, l = arr.length; i < l; i++) {
 		arr[i] = (arr[i] - min) / (max - min)
 	}
 
