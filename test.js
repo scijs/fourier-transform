@@ -10,6 +10,8 @@ var ndfft = require('ndarray-fft')
 var ndarray = require('ndarray')
 var isBrowser = require('is-browser')
 
+var isBrowser = typeof document !== 'undefined'
+
 var N = 4096/4;
 var real = new Float32Array(N);
 var im = new Float32Array(N);
@@ -63,9 +65,12 @@ test.skip('rfft', function (t) {
 		mag3.push(Math.sqrt(rv*rv + iv*iv))
 	}
 	normalize(mag3)
-	draw(mag1)
-	draw(mag2)
-	draw(mag3)
+
+  if (isBrowser) {
+  	draw(mag1)
+  	draw(mag2)
+  	draw(mag3)
+  }
 
 	for (var i = 0; i < mag1.length; i++) {
 		var v1 = mag1[i]
@@ -102,31 +107,28 @@ test('performance', function (t) {
 });
 
 
+if (isBrowser) {
+  function draw (arr) {
+    let canvas = document.body.appendChild(document.createElement('canvas'));
+    let ctx = canvas.getContext('2d')
+    canvas.style.cssText = `
+    margin: 5px;
+    display: block;
+    outline: 1px solid rgba(255,240,230,1);
+    `
 
-function draw (arr) {
-	if (!isBrowser) return
+    let w = canvas.width;
+    let h = canvas.height;
 
-	var canvas = document.body.appendChild(document.createElement('canvas'));
-	var ctx = canvas.getContext('2d')
-	canvas.style.cssText = `
-		margin: 5px;
-		display: block;
-		outline: 1px solid rgba(255,240,230,1);
-	`
+    ctx.beginPath();
+    for (let i = 0, len = arr.length; i < len; i++) {
+      let r = i/len;
+      ctx.lineTo(r*w, h - h*arr[i]);
+    }
 
-	var w = canvas.width;
-	var h = canvas.height;
-
-	ctx.beginPath();
-	for (var i = 0, len = arr.length; i < len; i++) {
-		var r = i/len;
-		ctx.lineTo(r*w, h - h*arr[i]);
-	}
-
-	ctx.stroke();
-	ctx.closePath();
-}
-
+    ctx.stroke();
+    ctx.closePath();
+  }
 
 
 function normalize (arr) {
