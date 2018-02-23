@@ -11,12 +11,8 @@ module.exports = rfft
 
 
 var maxLen = 8192
-var maxBytes = 65536 // maxLen * Float64Array.BYTES_PER_ELEMENT
-
-var heap = new ArrayBuffer(maxBytes*4)
-var input = new Float64Array(heap, maxBytes, maxLen)
-var output = new Float64Array(heap, maxBytes*2, maxLen/2)
-var _rfft = FFT({Math: Math, Float64Array: Float64Array}, null, heap)
+var heap = new Float64Array(maxLen * 4)
+var _rfft = FFT({Math: Math, Float64Array: Float64Array}, null, heap.buffer)
 
 function rfft (src) {
 	if (!src) throw Error('Input data is not provided, pass an array.')
@@ -27,11 +23,11 @@ function rfft (src) {
 	var k = Math.floor(Math.log(n) / Math.LN2)
 	if (Math.pow(2, k) !== n) throw Error('Invalid array size, must be a power of 2.')
 
-	input.set(src)
+	heap.set(src, maxLen)
 
 	_rfft(n, k)
 
-	return output.subarray(0, n/2)
+	return heap.subarray(maxLen * 2, maxLen * 2 + n/2)
 }
 
 
