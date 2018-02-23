@@ -35,9 +35,6 @@ function rfft (src) {
 }
 
 
-
-
-
 function FFT(stdlib, foreign, heap) {
 	'use asm'
 
@@ -50,7 +47,6 @@ function FFT(stdlib, foreign, heap) {
 	var imul = stdlib.Math.imul
 
 	//memory layout is [x, input, output]
-	var arr = new stdlib.Float64Array(heap)
 	var x = new stdlib.Float64Array(heap)
 	var input = 8192
 	var output = 16384
@@ -249,10 +245,10 @@ function FFT(stdlib, foreign, heap) {
 			rval = +(x[i << 3 >> 3])
 			ival = +(x[n-i-1 << 3 >> 3])
 			mag = bSi * sqrt(rval * rval + ival * ival)
-			arr[output + i << 3 >> 3] = mag
+			x[output + i << 3 >> 3] = mag
 		}
 
-		arr[output + 0 << 3 >> 3] = abs(bSi * x[0])
+		x[output + 0 << 3 >> 3] = abs(bSi * x[0])
 	}
 
 
@@ -266,12 +262,12 @@ function FFT(stdlib, foreign, heap) {
 		halfSize = n >>> 1
 		nm1 = n - 1|0
 
-		x[0] = arr[input + 0 << 3 >> 3]
+		x[0] = x[input + 0 << 3 >> 3]
 
 		do {
 			r = r + halfSize|0
-			x[i << 3 >> 3] = arr[input + r << 3 >> 3]
-			x[r << 3 >> 3] = arr[input + i << 3 >> 3]
+			x[i << 3 >> 3] = x[input + r << 3 >> 3]
+			x[r << 3 >> 3] = x[input + i << 3 >> 3]
 
 			i = i + 1|0
 
@@ -282,16 +278,16 @@ function FFT(stdlib, foreign, heap) {
 			}
 
 			if ((r|0) >= (i|0)) {
-				x[i << 3 >> 3]     = arr[input + r << 3 >> 3]
-				x[r << 3 >> 3]     = arr[input + i << 3 >> 3]
+				x[i << 3 >> 3]     = x[input + r << 3 >> 3]
+				x[r << 3 >> 3]     = x[input + i << 3 >> 3]
 
-				x[nm1-i << 3 >> 3] = arr[input + nm1-r << 3 >> 3]
-				x[nm1-r << 3 >> 3] = arr[input + nm1-i << 3 >> 3]
+				x[nm1-i << 3 >> 3] = x[input + nm1-r << 3 >> 3]
+				x[nm1-r << 3 >> 3] = x[input + nm1-i << 3 >> 3]
 			}
 			i = i + 1|0
 		} while ((i|0) < (halfSize|0))
 
-		x[nm1 << 3 >> 3] = arr[input + nm1 << 3 >> 3]
+		x[nm1 << 3 >> 3] = x[input + nm1 << 3 >> 3]
 
 	}
 
