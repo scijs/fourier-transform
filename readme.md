@@ -5,19 +5,15 @@ Minimalistic and efficient FFT implementation for 2<sup>n</sup>-size inputs. Inc
 [![npm install fourier-transform](https://nodei.co/npm/fourier-transform.png?mini=true)](https://npmjs.org/package/fourier-transform/)
 
 ```js
-var ft = require('fourier-transform');
-var db = require('decibels');
+var ft = require('fourier-transform')
+var db = require('decibels')
+var sine = require('audio-oscillator/sin')
 
-var frequency = 440;
-var size = 1024;
-var sampleRate = 44100;
-var waveform = new Float32Array(size);
-for (var i = 0; i < size; i++) {
-	waveform[i] = Math.sin(frequency * Math.PI * 2 * (i / sampleRate));
-}
+// generate sine wave 440 Hz
+var waveform = sine(1024, 440)
 
 //get normalized magnitudes for frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
-var spectrum = ft(waveform);
+var spectrum = ft(waveform)
 
 //convert to decibels
 var decibels = spectrum.map((value) => db.fromGain(value))
