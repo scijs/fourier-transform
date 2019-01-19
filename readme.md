@@ -31,11 +31,11 @@ To all the [existing fft packages](./benchmark.md), without them this one would 
 
 ## Contribute
 
-If you find it slow, difficult or broken, please [post an issue](https://github.com/dfcreative/fourier-transform/issues). If you have ideas or know-hows for better implementation - [PR’s are welcome](https://github.com/dfcreative/fourier-transform/pulls).
+If you find it slow, difficult or broken, please [post an issue](https://github.com/dy/fourier-transform/issues). If you have ideas or know-hows for better implementation - [PR’s are welcome](https://github.com/dy/fourier-transform/pulls).
 
 ## Related
 
 * [fourier transforms benchmark](./benchmark.md).
 * [ndarray-fft](https://github.com/scijs/ndarray-fft) FFT for ndarrays, allowing not-power-of-two inputs.
-* [gl-fourier](https://github.com/dfcreative/gl-fourier) WebGL fourier transform implementations.
-* [gl-spectrum](https://github.com/dfcreative/gl-spectrum) render spectrum in 2d/3d canvas.
+* [gl-fourier](https://github.com/dy/gl-fourier) WebGL fourier transform implementations.
+* [gl-spectrum](https://github.com/dy/gl-spectrum) render spectrum in 2d/3d canvas.

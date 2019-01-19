@@ -10,7 +10,7 @@ The task is to process waveform of 4096 real/imaginary numbers 1000 times. Resul
 * [ndarray-fft](https://www.npmjs.com/package/ndarray-fft) __0.37s__
 * [fft](https://www.npmjs.com/package/fft) __4s__
 * [dsp-fft](https://www.npmjs.com/package/dsp-fft) __40s__
-* [webgl-dft](https://github.com/dfcreative/gl-fourier) __5.4s__
+* [webgl-dft](https://github.com/dy/gl-fourier) __5.4s__
 * [corbanbrook/dsp.js](https://github.com/corbanbrook/dsp.js)
 	* fft __0.222s__
 	* rfft (real-values only FFT) __0.098s__ ★
