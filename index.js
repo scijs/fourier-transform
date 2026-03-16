@@ -3,6 +3,9 @@
  * Returns magnitude spectrum as Float64Array of length N/2.
  *
  * @module fourier-transform
+ * @param {Float32Array|Float64Array|Array} input - Time-domain signal, length must be power of 2 (>=2).
+ * @param {Float64Array} [output] - Optional pre-allocated output buffer (length N/2). If omitted, returns internal buffer (overwritten on next call with same N).
+ * @returns {Float64Array} Magnitude spectrum, length N/2.
  */
 
 const { sqrt, sin, cos, abs, SQRT1_2 } = Math
@@ -10,10 +13,12 @@ const TWO_PI = 6.283185307179586
 
 // Per-size cached buffers and precomputed twiddle factors
 const cache = new Map()
+let lastN = 0, lastEntry = null
 
 function init(N) {
 	const x = new Float64Array(N)
 	const spectrum = new Float64Array(N >>> 1)
+	const bSi = 2 / N
 
 	// Count twiddle factors per stage
 	let total = 0, n2 = 2, nn = N >>> 1
@@ -47,17 +52,17 @@ function init(N) {
 		si++
 	}
 
-	const entry = { x, spectrum, tw, stages }
+	const entry = { x, spectrum, bSi, tw, stages }
 	cache.set(N, entry)
 	return entry
 }
 
-export default function rfft(input) {
+export default function rfft(input, output) {
 	const N = input.length
-	if (!N || (N & (N - 1))) throw Error('Input length must be a positive power of 2.')
+	if (N < 2 || (N & (N - 1))) throw Error('Input length must be a power of 2 (>= 2).')
 
-	const { x, spectrum, tw, stages } = cache.get(N) || init(N)
-	const bSi = 2 / N
+	const entry = N === lastN ? lastEntry : (lastEntry = cache.get(N) || init(N), lastN = N, lastEntry)
+	const { x, spectrum, bSi, tw, stages } = entry
 
 	reverseBinPermute(N, x, input)
 
@@ -105,7 +110,7 @@ export default function rfft(input) {
 				}
 			} else {
 				for (let i0 = ix; i0 < N; i0 += id) {
-					const i1 = i0, i3 = i1 + n4 + n4, i4 = i3 + n4
+					const i1 = i0, i3 = i1 + 2, i4 = i3 + 1
 					const t1 = x[i3] + x[i4]
 					x[i4] -= x[i3]
 					x[i3] = x[i1] - t1
@@ -167,14 +172,15 @@ export default function rfft(input) {
 	}
 
 	// Magnitude spectrum: Re(X[k]) = x[k], Im(X[k]) = x[N-k]
+	const out = output || spectrum
 	let i = N >>> 1
 	while (--i) {
 		const rval = x[i], ival = x[N - i]
-		spectrum[i] = bSi * sqrt(rval * rval + ival * ival)
+		out[i] = bSi * sqrt(rval * rval + ival * ival)
 	}
-	spectrum[0] = abs(bSi * x[0])
+	out[0] = abs(bSi * x[0])
 
-	return spectrum
+	return out
 }
 
 function reverseBinPermute(N, dest, source) {
