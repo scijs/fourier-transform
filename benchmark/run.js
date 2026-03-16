@@ -1,38 +1,20 @@
-/* eslint-disable semi */
-var suite = require('./suite')
-var Benchmark = require('benchmark');
-function noop () {}
+import rfft from '../index.js'
 
-run(build(suite));
+const sizes = [256, 1024, 4096, 16384]
+const warmup = 1000
+const iterations = 50000
 
-function build (suite) {
-  // a little benchmark.js wrapper
-  var tests = {};
-  var libName = '';
-  function setup (name, fn) {
-    libName = name;
-    return fn ? fn() : null;
-  }
-  function test (name, fn) { tests[libName + ' - ' + name] = fn; }
-  setup.skip = test.skip = noop
+for (const N of sizes) {
+	const input = new Float32Array(N)
+	for (let i = 0; i < N; i++) input[i] = Math.random() * 2 - 1
 
-  suite(setup, test)
-  return tests
-}
+	// warmup (also primes twiddle cache)
+	for (let i = 0; i < warmup; i++) rfft(input)
 
-function run (tests) {
-  var bench = new Benchmark.Suite();
-  Object.keys(tests).forEach((k) => {
-    bench.add(k, tests[k]);
-  });
-  bench.on('cycle', function (event) {
-    console.log(String(event.target));
-  })
-  .on('complete', function () {
-    console.log('Fastest is ', this.filter('fastest').map('name'));
-  })
-  .on('error', function (e) {
-    console.error('ERROR', e);
-  });
-  bench.run({ 'async': false });
+	const start = performance.now()
+	for (let i = 0; i < iterations; i++) rfft(input)
+	const elapsed = performance.now() - start
+
+	const us = (elapsed / iterations * 1000).toFixed(1)
+	console.log(`N=${String(N).padStart(5)}  ${us.padStart(6)}µs/call  (${iterations} iters, ${elapsed.toFixed(0)}ms)`)
 }

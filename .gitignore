@@ -60,3 +60,4 @@ docs
 design
 instances
 *node_modules
+/.claude

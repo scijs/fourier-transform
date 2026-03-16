@@ -1,146 +1,85 @@
-'use strict'
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import rfft from './index.js'
 
-var test = require('tape')
-var assert = require('assert')
-var almost = require('almost-equal')
-var rfft = require('./')
-var rfftAsm = require('./asm')
-var dsp = require('dsp.js')
-var ndfft = require('ndarray-fft')
-var ndarray = require('ndarray')
+const EPSILON = 1e-6
 
-var isBrowser = typeof document !== 'undefined'
+test('rejects invalid input', () => {
+	assert.throws(() => rfft(new Float32Array(0)))
+	assert.throws(() => rfft(new Float32Array(3)))
+	assert.throws(() => rfft(new Float32Array(6)))
+	assert.throws(() => rfft(new Float32Array(15)))
+})
 
-var N = 4096/4;
-var real = new Float32Array(N);
-var im = new Float32Array(N);
+test('N=2', () => {
+	const s = rfft(new Float32Array([1, 0]))
+	assert.equal(s.length, 1)
+	assert(Math.abs(s[0] - 1) < EPSILON, `DC: ${s[0]}`)
+})
 
-for (var i = 0; i < N; i++) {
-	real[i] = Math.sin(10000 * (i / N) / (Math.PI * 2) );
-	im[i] = 0;
-	// real[i] = Math.random() * 2 - 0.5;
-	// im[i] = Math.random() * 2 - 0.5;
-}
+test('N=4 DC', () => {
+	const s = rfft(new Float32Array([1, 1, 1, 1]))
+	assert.equal(s.length, 2)
+	assert(Math.abs(s[0] - 2) < EPSILON, `DC: ${s[0]}`)
+	assert(s[1] < EPSILON, `bin 1: ${s[1]}`)
+})
 
-var result = [
- 0.2007274180650711,
- 0.29625651240348816,
- 0.6431688070297241,
- 0.628587007522583,
- 0.10844749957323074,
- 0.04224899411201477,
- 0.016048559918999672,
- 0.013186296448111534 ];
+test('DC signal', () => {
+	const N = 256
+	const s = rfft(new Float32Array(N).fill(1))
+	assert.equal(s.length, N / 2)
+	assert(Math.abs(s[0] - 2) < EPSILON, `DC: ${s[0]}`)
+	for (let i = 1; i < s.length; i++)
+		assert(s[i] < EPSILON, `bin ${i}: ${s[i]}`)
+})
 
-assert.almost = function (x, y) {
-	if (x.length && y.length) return x.every(function (x, i) {
-		return assert.almost(x, y[i]);
-	});
-
-	var EPSILON = 10e-2;
-	if (!almost(x, y, EPSILON)) assert.fail(x, y,
-		`${x} ≈ ${y}`, '≈');
-
-	return true;
-};
-
-
-test('rfft', function (t) {
-	//RFFT direct transform
-	var mag1 = rfftAsm(real);
-
-	//FFT transform
-	var fft = new dsp.FFT(N, 44100);
-	fft.forward(real);
-	var mag2 = fft.spectrum;
-
-	//ndarray-fft
-	var x = ndarray(real);
-	var y = ndarray(im);
-	ndfft(1, x, y);
-	var mag3 = new Array();
-	for (var i = x.shape[0]/2; i < x.shape[0]; i++) {
-		var rv = x.get(i), iv = y.get(i);
-		mag3.push(Math.sqrt(rv*rv + iv*iv))
+test('pure cosine at various bins', () => {
+	const N = 256
+	for (const k of [1, 7, 32, 100]) {
+		const input = new Float32Array(N)
+		for (let n = 0; n < N; n++) input[n] = Math.cos(2 * Math.PI * k * n / N)
+		const s = rfft(input)
+		assert(Math.abs(s[k] - 1) < EPSILON, `k=${k}: expected 1, got ${s[k]}`)
+		for (let i = 1; i < s.length; i++) {
+			if (i === k) continue
+			assert(s[i] < 1e-4, `k=${k}, bin ${i}: expected ~0, got ${s[i]}`)
+		}
 	}
-	normalize(mag3)
+})
 
-  	draw(mag1)
-  	draw(mag2)
-  	draw(mag3)
-
-	for (var i = 0; i < mag1.length; i++) {
-		var v1 = mag1[i]
-		var v2 = mag2[i]
-		var v3 = mag3[i]
-		// if (Math.abs(v1 - v2) > 1e-2) console.log(v1, v2, i)
+test('linearity (non-overlapping frequencies)', () => {
+	const N = 128
+	const a = new Float32Array(N), b = new Float32Array(N), sum = new Float32Array(N)
+	for (let i = 0; i < N; i++) {
+		a[i] = Math.cos(2 * Math.PI * 3 * i / N)
+		b[i] = 0.5 * Math.cos(2 * Math.PI * 10 * i / N)
+		sum[i] = a[i] + b[i]
 	}
+	const sa = new Float64Array(rfft(a))
+	const sb = new Float64Array(rfft(b))
+	const sab = rfft(sum)
 
-	// assert.almost(mag1, mag2);
+	for (let i = 0; i < sa.length; i++)
+		assert(Math.abs(sab[i] - (sa[i] + sb[i])) < 1e-4, `bin ${i}: ${sab[i]} != ${sa[i]} + ${sb[i]}`)
+})
 
-	t.end()
-});
-
-
-test('performance', function (t) {
-
-	assert.almost(rfft(real), rfftAsm(real))
-
-	console.time('asm')
-	for (var i = 0; i < 1e4; i++) {
-		rfftAsm(real);
+test('various power-of-2 sizes', () => {
+	for (const N of [4, 8, 16, 32, 64, 512, 1024, 2048, 4096]) {
+		const input = new Float32Array(N)
+		for (let i = 0; i < N; i++) input[i] = Math.sin(2 * Math.PI * 3 * i / N)
+		const s = rfft(input)
+		assert.equal(s.length, N / 2)
+		// bin 3 should be the peak (for N >= 8)
+		if (N >= 8) {
+			for (let i = 1; i < s.length; i++) {
+				if (i === 3) continue
+				assert(s[i] < s[3] + EPSILON, `N=${N}: bin ${i} (${s[i]}) > bin 3 (${s[3]})`)
+			}
+		}
 	}
-	console.timeEnd('asm')
+})
 
-	console.time('regular')
-	for (var i = 0; i < 1e4; i++) {
-		rfft(real);
-	}
-	console.timeEnd('regular')
-
-
-
-	t.end()
-});
-
-
-
-function draw (arr) {
-	if (!isBrowser) return
-
-	let canvas = document.body.appendChild(document.createElement('canvas'));
-	let ctx = canvas.getContext('2d')
-	canvas.style.cssText = `
-	margin: 5px;
-	display: block;
-	outline: 1px solid rgba(255,240,230,1);
-	`
-
-	let w = canvas.width;
-	let h = canvas.height;
-
-	ctx.beginPath();
-	for (let i = 0, len = arr.length; i < len; i++) {
-	  let r = i/len;
-	  ctx.lineTo(r*w, h - h*arr[i]);
-	}
-
-	ctx.stroke();
-	ctx.closePath();
-}
-
-function normalize (arr) {
-	var max = -999;
-	var min = 999;
-
-	for (var i = 0, l = arr.length; i < l; i++) {
-		max = Math.max(arr[i], max);
-		min = Math.min(arr[i], min);
-	}
-
-	for (var i = 0, l = arr.length; i < l; i++) {
-		arr[i] = (arr[i] - min) / (max - min)
-	}
-
-	return arr;
-}
+test('returns Float64Array', () => {
+	const s = rfft(new Float32Array([1, 0, 0, 0]))
+	assert(s instanceof Float64Array)
+})
