@@ -16,9 +16,10 @@
     "fourier",
     "dsp",
     "fft",
+    "rfft",
     "dft"
   ],
-  "author": "Dima Yv <dfcreative@gmail.com>",
+  "author": "Dmitry Iv. <dfcreative@gmail.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/scijs/fourier-transform/issues"
