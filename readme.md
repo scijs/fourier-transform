@@ -1,4 +1,4 @@
-# fourier-transform
+# fourier-transform [![test](https://github.com/scijs/fourier-transform/actions/workflows/test.yml/badge.svg)](https://github.com/scijs/fourier-transform/actions/workflows/test.yml)
 
 Efficient real-valued FFT for 2<sup>n</sup>-size inputs. Split-radix algorithm with precomputed twiddle factors and typed-array buffers. Zero dependencies.
 
@@ -73,3 +73,5 @@ Based on the split-radix real FFT from [dsp.js](https://github.com/corbanbrook/d
 ## License
 
 MIT
+
+<p align="center"><a href="https://github.com/krishnized/license">ॐ</a></p>
