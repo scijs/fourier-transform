@@ -1,11 +1,7 @@
 /**
  * Real-valued split-radix FFT.
- * Returns magnitude spectrum as Float64Array of length N/2.
  *
  * @module fourier-transform
- * @param {Float32Array|Float64Array|Array} input - Time-domain signal, length must be power of 2 (>=2).
- * @param {Float64Array} [output] - Optional pre-allocated output buffer (length N/2). If omitted, returns internal buffer (overwritten on next call with same N).
- * @returns {Float64Array} Magnitude spectrum, length N/2.
  */
 
 const { sqrt, sin, cos, abs, SQRT1_2 } = Math
@@ -16,12 +12,16 @@ const cache = new Map()
 let lastN = 0, lastEntry = null
 
 function init(N) {
+	const half = N >>> 1
 	const x = new Float64Array(N)
-	const spectrum = new Float64Array(N >>> 1)
+	const spectrum = new Float64Array(half)
+	const re = new Float64Array(half + 1)
+	const im = new Float64Array(half + 1)
+	const complex = { re, im }
 	const bSi = 2 / N
 
 	// Count twiddle factors per stage
-	let total = 0, n2 = 2, nn = N >>> 1
+	let total = 0, n2 = 2, nn = half
 	const stages = []
 	while ((nn = nn >>> 1)) {
 		n2 = n2 << 1
@@ -33,7 +33,7 @@ function init(N) {
 
 	// Interleaved twiddle table: [cc1, ss1, cc3, ss3] per entry
 	const tw = new Float64Array(total << 2)
-	n2 = 2; nn = N >>> 1
+	n2 = 2; nn = half
 	let si = 0
 	while ((nn = nn >>> 1)) {
 		n2 = n2 << 1
@@ -52,17 +52,26 @@ function init(N) {
 		si++
 	}
 
-	const entry = { x, spectrum, bSi, tw, stages }
+	const entry = { x, spectrum, complex, bSi, tw, stages }
 	cache.set(N, entry)
 	return entry
 }
 
-export default function rfft(input, output) {
+function getEntry(N) {
+	if (N === lastN) return lastEntry
+	const entry = cache.get(N) || init(N)
+	lastN = N
+	lastEntry = entry
+	return entry
+}
+
+// Shared butterfly computation
+function transform(input) {
 	const N = input.length
 	if (N < 2 || (N & (N - 1))) throw Error('Input length must be a power of 2 (>= 2).')
 
-	const entry = N === lastN ? lastEntry : (lastEntry = cache.get(N) || init(N), lastN = N, lastEntry)
-	const { x, spectrum, bSi, tw, stages } = entry
+	const entry = getEntry(N)
+	const { x, tw, stages } = entry
 
 	reverseBinPermute(N, x, input)
 
@@ -171,8 +180,21 @@ export default function rfft(input, output) {
 		si++
 	}
 
-	// Magnitude spectrum: Re(X[k]) = x[k], Im(X[k]) = x[N-k]
+	return entry
+}
+
+/**
+ * Compute magnitude spectrum of real-valued input.
+ * @param {ArrayLike<number>} input - length must be power of 2 (>= 2).
+ * @param {Float64Array} [output] - Optional buffer (length N/2). If omitted, returns internal view (overwritten on next call with same N).
+ * @returns {Float64Array} Magnitude spectrum, length N/2.
+ */
+export default function rfft(input, output) {
+	const entry = transform(input)
+	const N = input.length
+	const { x, spectrum, bSi } = entry
 	const out = output || spectrum
+
 	let i = N >>> 1
 	while (--i) {
 		const rval = x[i], ival = x[N - i]
@@ -181,6 +203,32 @@ export default function rfft(input, output) {
 	out[0] = abs(bSi * x[0])
 
 	return out
+}
+
+/**
+ * Compute complex spectrum of real-valued input (unnormalized DFT).
+ * @param {ArrayLike<number>} input - length must be power of 2 (>= 2).
+ * @param {{re: Float64Array, im: Float64Array}} [output] - Optional buffers (length N/2+1 each). If omitted, returns internal view.
+ * @returns {{re: Float64Array, im: Float64Array}} Complex spectrum, N/2+1 bins (DC through Nyquist).
+ */
+export function fft(input, output) {
+	const entry = transform(input)
+	const N = input.length
+	const half = N >>> 1
+	const { x, complex } = entry
+	const re = output ? output.re : complex.re
+	const im = output ? output.im : complex.im
+
+	re[0] = x[0]
+	im[0] = 0
+	for (let k = 1; k < half; k++) {
+		re[k] = x[k]
+		im[k] = x[N - k]
+	}
+	re[half] = x[half]
+	im[half] = 0
+
+	return output || complex
 }
 
 function reverseBinPermute(N, dest, source) {

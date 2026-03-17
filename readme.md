@@ -1,37 +1,73 @@
-# fourier-transform [![stable](https://img.shields.io/badge/stability-stable-brightgreen.svg)](http://github.com/badges/stability-badges) [![Build Status](https://img.shields.io/travis/scijs/fourier-transform.svg)](https://travis-ci.org/scijs/fourier-transform)
+# fourier-transform
 
-Minimalistic and efficient FFT implementation for 2<sup>n</sup>-size inputs. Includes regular and asm.js versions.
+Efficient real-valued FFT for 2<sup>n</sup>-size inputs. Split-radix algorithm with precomputed twiddle factors and typed-array buffers. Zero dependencies.
 
-[![npm install fourier-transform](https://nodei.co/npm/fourier-transform.png?mini=true)](https://npmjs.org/package/fourier-transform/)
+## Usage
 
 ```js
-var ft = require('fourier-transform')
-var db = require('decibels')
-var sine = require('audio-oscillator/sin')
+import rfft from 'fourier-transform'
 
-// generate sine wave 440 Hz
-var waveform = sine(1024, 440)
-
-//get normalized magnitudes for frequencies from 0 to 22050 with interval 44100/1024 ≈ 43Hz
-var spectrum = ft(waveform)
-
-//convert to decibels
-var decibels = spectrum.map((value) => db.fromGain(value))
+// magnitude spectrum (N/2 bins)
+const spectrum = rfft(waveform)
 ```
 
-To use asm.js version, require as `require('fourier-transform/asm')`. That is ~35% faster.
+```js
+import { fft } from 'fourier-transform'
 
-## Thanks
+// complex DFT output (N/2+1 bins, unnormalized)
+const { re, im } = fft(waveform)
+```
 
-To all the [existing fft packages](./benchmark.md), without them this one would not be possible. Special thanks to @corbanbrook for the most efficient implementation in [dsp.js](https://github.com/corbanbrook/dsp.js). This package is based on [dsp.js RFFT](https://github.com/corbanbrook/dsp.js/blob/master/dsp.js#L554), which is based on [RealFFT](http://www.jjj.de/fxt/).
+## API
 
-## Contribute
+### `rfft(input, output?)` — default export
 
-If you find it slow, difficult or broken, please [post an issue](https://github.com/dfcreative/fourier-transform/issues). If you have ideas or know-hows for better implementation - [PR’s are welcome](https://github.com/dfcreative/fourier-transform/pulls).
+Returns magnitude spectrum as `Float64Array` of length N/2.
 
-## Related
+- `input` — `Float32Array`, `Float64Array`, or plain `Array`. Length must be power of 2 (>= 2).
+- `output` — optional `Float64Array(N/2)` to write into.
+- Returns internal buffer if no output provided (overwritten on next call with same N).
 
-* [fourier transforms benchmark](./benchmark.md).
-* [ndarray-fft](https://github.com/scijs/ndarray-fft) FFT for ndarrays, allowing not-power-of-two inputs.
-* [gl-fourier](https://github.com/dfcreative/gl-fourier) WebGL fourier transform implementations.
-* [gl-spectrum](https://github.com/dfcreative/gl-spectrum) render spectrum in 2d/3d canvas.
+Normalization: a unit-amplitude cosine at frequency bin *k* produces `spectrum[k] = 1.0`.
+
+### `fft(input, output?)` — named export
+
+Returns complex DFT as `{ re, im }`, each `Float64Array` of length N/2+1 (DC through Nyquist).
+
+- `output` — optional `{ re: Float64Array(N/2+1), im: Float64Array(N/2+1) }`.
+- Unnormalized: `X[k] = sum( x[n] * e^(-j*2*pi*k*n/N) )`.
+- DC and Nyquist bins always have `im = 0` (real input).
+
+### View semantics
+
+Both functions return internal cached buffers by default. The next call with the same N overwrites the previous result. Pass an output buffer to keep results across calls:
+
+```js
+const out = new Float64Array(N / 2)
+rfft(signal, out) // safe to keep
+```
+
+## Performance
+
+N=4096 real-valued FFT, complex output, 20k iterations (lower is better):
+
+```
+fft.js (indutny)          16.0µs/call         — radix-4
+fourier-transform         17.4µs/call   ×1.1  — split-radix
+ooura                     23.0µs/call   ×1.4  — Ooura C port
+ml-fft                    36.7µs/call   ×2.3
+dsp.js                    47.0µs/call   ×2.9  — original split-radix ancestor
+kissfft-wasm              48.5µs/call   ×3.0  — WASM KissFFT
+ndarray-fft               61.4µs/call   ×3.8
+fft-js                  2370.9µs/call  ×148.3  — naive recursive
+```
+
+`npm run benchmark` to reproduce.
+
+## Acknowledgments
+
+Based on the split-radix real FFT from [dsp.js](https://github.com/corbanbrook/dsp.js) by @corbanbrook, itself derived from [RealFFT](http://www.jjj.de/fxt/).
+
+## License
+
+MIT

@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import rfft from './index.js'
+import rfft, { fft } from './index.js'
 
 const EPSILON = 1e-6
 
-// Validation
+// --- Validation ---
 
 test('rejects invalid input', () => {
 	assert.throws(() => rfft(new Float32Array(0)))
@@ -14,7 +14,7 @@ test('rejects invalid input', () => {
 	assert.throws(() => rfft(new Float32Array(15)))
 })
 
-// Fundamental identities
+// --- Fundamental identities ---
 
 test('impulse → flat spectrum', () => {
 	for (const N of [4, 8, 64, 1024]) {
@@ -35,6 +35,12 @@ test('DC signal', () => {
 		for (let i = 1; i < s.length; i++)
 			assert(s[i] < EPSILON, `N=${N} bin ${i}: ${s[i]}`)
 	}
+})
+
+test('zero signal', () => {
+	const s = rfft(new Float32Array(64))
+	for (let i = 0; i < s.length; i++)
+		assert.equal(s[i], 0, `bin ${i}: ${s[i]}`)
 })
 
 test('pure cosine at various bins', () => {
@@ -93,8 +99,6 @@ test('Parseval energy conservation', () => {
 		`Parseval: time=${timeEnergy.toFixed(6)}, freq=${freqEnergy.toFixed(6)}`)
 })
 
-// Linearity
-
 test('linearity (non-overlapping frequencies)', () => {
 	const N = 128
 	const a = new Float32Array(N), b = new Float32Array(N), sum = new Float32Array(N)
@@ -111,7 +115,7 @@ test('linearity (non-overlapping frequencies)', () => {
 		assert(Math.abs(sab[i] - (sa[i] + sb[i])) < 1e-4, `bin ${i}: ${sab[i]} != ${sa[i]} + ${sb[i]}`)
 })
 
-// Sizes
+// --- Sizes ---
 
 test('all power-of-2 sizes from 2 to 16384', () => {
 	for (let N = 2; N <= 16384; N *= 2) {
@@ -119,7 +123,6 @@ test('all power-of-2 sizes from 2 to 16384', () => {
 		for (let i = 0; i < N; i++) input[i] = Math.sin(2 * Math.PI * 3 * i / N)
 		const s = rfft(input)
 		assert.equal(s.length, N / 2)
-		// bin 3 should be the peak (for N >= 8 where bin 3 is a distinct frequency)
 		if (N >= 8) {
 			for (let i = 1; i < s.length; i++) {
 				if (i === 3) continue
@@ -129,7 +132,7 @@ test('all power-of-2 sizes from 2 to 16384', () => {
 	}
 })
 
-// Output modes
+// --- Output modes ---
 
 test('returns Float64Array', () => {
 	assert(rfft(new Float32Array([1, 0, 0, 0])) instanceof Float64Array)
@@ -159,8 +162,7 @@ test('internal buffer overwritten on repeated calls (view semantics)', () => {
 		b[i] = Math.cos(2 * Math.PI * 10 * i / N)
 	}
 	const sa = rfft(a)
-	const peakA = sa[5]
-	assert(Math.abs(peakA - 1) < EPSILON)
+	assert(Math.abs(sa[5] - 1) < EPSILON)
 
 	rfft(b) // overwrites sa since same N
 
@@ -168,8 +170,94 @@ test('internal buffer overwritten on repeated calls (view semantics)', () => {
 	assert(Math.abs(sa[10] - 1) < EPSILON, `sa now reflects b's spectrum`)
 })
 
-test('zero signal', () => {
-	const s = rfft(new Float32Array(64))
-	for (let i = 0; i < s.length; i++)
-		assert.equal(s[i], 0, `bin ${i}: ${s[i]}`)
+// --- Complex output (fft) ---
+
+test('fft: returns N/2+1 complex bins', () => {
+	const N = 64
+	const { re, im } = fft(new Float32Array(N))
+	assert.equal(re.length, N / 2 + 1)
+	assert.equal(im.length, N / 2 + 1)
+})
+
+test('fft: DC signal → real-only X[0]=N', () => {
+	const N = 64
+	const { re, im } = fft(new Float32Array(N).fill(1))
+	assert(Math.abs(re[0] - N) < EPSILON, `DC re: ${re[0]}`)
+	assert(Math.abs(im[0]) < EPSILON, `DC im: ${im[0]}`)
+	for (let k = 1; k <= N / 2; k++) {
+		assert(Math.abs(re[k]) < EPSILON, `re[${k}]: ${re[k]}`)
+		assert(Math.abs(im[k]) < EPSILON, `im[${k}]: ${im[k]}`)
+	}
+})
+
+test('fft: cosine → real component X[k] = N/2', () => {
+	const N = 128
+	for (const k of [1, 5, 32]) {
+		const input = new Float32Array(N)
+		for (let n = 0; n < N; n++) input[n] = Math.cos(2 * Math.PI * k * n / N)
+		const { re, im } = fft(input)
+		assert(Math.abs(re[k] - N / 2) < EPSILON, `cos k=${k}: re=${re[k]}, expected ${N / 2}`)
+		assert(Math.abs(im[k]) < EPSILON, `cos k=${k}: im=${im[k]}, expected 0`)
+	}
+})
+
+test('fft: sine → imaginary component X[k] = -jN/2', () => {
+	const N = 128
+	for (const k of [1, 5, 63]) {
+		const input = new Float32Array(N)
+		for (let n = 0; n < N; n++) input[n] = Math.sin(2 * Math.PI * k * n / N)
+		const { re, im } = fft(input)
+		assert(Math.abs(re[k]) < EPSILON, `sin k=${k}: re=${re[k]}, expected 0`)
+		assert(Math.abs(im[k] - (-N / 2)) < EPSILON, `sin k=${k}: im=${im[k]}, expected ${-N / 2}`)
+	}
+})
+
+test('fft: DC and Nyquist always have zero imaginary', () => {
+	for (const N of [4, 64, 512]) {
+		const input = new Float32Array(N)
+		for (let i = 0; i < N; i++) input[i] = Math.sin(i * 1.7) + Math.cos(i * 0.3)
+		const { im } = fft(input)
+		assert.equal(im[0], 0, `N=${N}: DC im must be 0`)
+		assert.equal(im[N / 2], 0, `N=${N}: Nyquist im must be 0`)
+	}
+})
+
+test('fft: magnitude matches rfft', () => {
+	const N = 256
+	const input = new Float32Array(N)
+	for (let i = 0; i < N; i++) input[i] = Math.sin(i * 0.7) + Math.cos(i * 1.3)
+
+	const mag = new Float64Array(rfft(input))
+	const { re, im } = fft(input)
+
+	const bSi = 2 / N
+	assert(Math.abs(mag[0] - Math.abs(bSi * re[0])) < EPSILON, `DC mismatch`)
+	for (let k = 1; k < N / 2; k++) {
+		const expected = bSi * Math.sqrt(re[k] * re[k] + im[k] * im[k])
+		assert(Math.abs(mag[k] - expected) < EPSILON, `bin ${k}: rfft=${mag[k]}, fft=${expected}`)
+	}
+})
+
+test('fft: output buffer parameter', () => {
+	const N = 64
+	const out = { re: new Float64Array(N / 2 + 1), im: new Float64Array(N / 2 + 1) }
+	const ret = fft(new Float32Array(N).fill(1), out)
+	assert.equal(ret, out)
+	assert(Math.abs(out.re[0] - N) < EPSILON)
+})
+
+test('fft: view overwritten on repeated calls', () => {
+	const N = 64
+	const a = new Float32Array(N), b = new Float32Array(N)
+	for (let i = 0; i < N; i++) {
+		a[i] = Math.cos(2 * Math.PI * 5 * i / N)
+		b[i] = Math.sin(2 * Math.PI * 10 * i / N)
+	}
+	const ra = fft(a)
+	assert(Math.abs(ra.re[5] - N / 2) < EPSILON)
+
+	fft(b) // overwrites ra since same N
+
+	assert(Math.abs(ra.re[5]) < EPSILON, 'ra.re[5] should be overwritten')
+	assert(Math.abs(ra.im[10] - (-N / 2)) < EPSILON, 'ra now reflects b')
 })
