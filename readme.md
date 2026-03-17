@@ -15,7 +15,7 @@ const spectrum = rfft(waveform)
 import { fft } from 'fourier-transform'
 
 // complex DFT output (N/2+1 bins, unnormalized)
-const { re, im } = fft(waveform)
+const [re, im] = fft(waveform)
 ```
 
 ## API
@@ -32,9 +32,9 @@ Normalization: a unit-amplitude cosine at frequency bin *k* produces `spectrum[k
 
 ### `fft(input, output?)` — named export
 
-Returns complex DFT as `{ re, im }`, each `Float64Array` of length N/2+1 (DC through Nyquist).
+Returns complex DFT as `[re, im]`, each `Float64Array` of length N/2+1 (DC through Nyquist).
 
-- `output` — optional `{ re: Float64Array(N/2+1), im: Float64Array(N/2+1) }`.
+- `output` — optional `[Float64Array(N/2+1), Float64Array(N/2+1)]`.
 - Unnormalized: `X[k] = sum( x[n] * e^(-j*2*pi*k*n/N) )`.
 - DC and Nyquist bins always have `im = 0` (real input).
 
@@ -52,17 +52,18 @@ rfft(signal, out) // safe to keep
 N=4096 real-valued FFT, complex output, 20k iterations (lower is better):
 
 ```
-fft.js (indutny)          16.2µs  ×1.0  — radix-4, interleaved output
-fourier-transform         17.3µs  ×1.1  — split-radix, separate re/im
-ooura                     23.1µs  ×1.4  — Ooura C port
-ml-fft                    36.0µs  ×2.2
-dsp.js                    47.1µs  ×2.9  — our split-radix ancestor
-kissfft-wasm              49.4µs  ×3.1  — WASM KissFFT
-ndarray-fft               62.6µs  ×3.9
-fft-js                  2297.4µs  ×142   — naive recursive
+fft.js (indutny)          16.5µs  ×1.0  — radix-4, interleaved output
+fourier-transform         17.8µs  ×1.1  — split-radix, separate re/im
+ooura                     23.6µs  ×1.4  — Ooura C port
+ml-fft                    37.0µs  ×2.2
+dsp.js                    48.1µs  ×2.9  — our split-radix ancestor
+kissfft-wasm              49.4µs  ×3.0  — WASM KissFFT
+ndarray-fft               63.1µs  ×3.8
+als-fft                 2311.4µs  ×140
+fft-js                  2329.2µs  ×141  — naive recursive
 ```
 
-Raw transform speed is identical to fft.js. The ×1.1 gap is entirely the cost of returning separate `re`/`im` arrays vs interleaved output.
+Raw transform speed is identical to fft.js. The gap is the cost of returning separate `re`/`im` arrays vs interleaved output.
 
 `npm run benchmark` to reproduce.
 

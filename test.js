@@ -174,14 +174,14 @@ test('internal buffer overwritten on repeated calls (view semantics)', () => {
 
 test('fft: returns N/2+1 complex bins', () => {
 	const N = 64
-	const { re, im } = fft(new Float32Array(N))
+	const [re, im] = fft(new Float32Array(N))
 	assert.equal(re.length, N / 2 + 1)
 	assert.equal(im.length, N / 2 + 1)
 })
 
 test('fft: DC signal → real-only X[0]=N', () => {
 	const N = 64
-	const { re, im } = fft(new Float32Array(N).fill(1))
+	const [re, im] = fft(new Float32Array(N).fill(1))
 	assert(Math.abs(re[0] - N) < EPSILON, `DC re: ${re[0]}`)
 	assert(Math.abs(im[0]) < EPSILON, `DC im: ${im[0]}`)
 	for (let k = 1; k <= N / 2; k++) {
@@ -195,7 +195,7 @@ test('fft: cosine → real component X[k] = N/2', () => {
 	for (const k of [1, 5, 32]) {
 		const input = new Float32Array(N)
 		for (let n = 0; n < N; n++) input[n] = Math.cos(2 * Math.PI * k * n / N)
-		const { re, im } = fft(input)
+		const [re, im] = fft(input)
 		assert(Math.abs(re[k] - N / 2) < EPSILON, `cos k=${k}: re=${re[k]}, expected ${N / 2}`)
 		assert(Math.abs(im[k]) < EPSILON, `cos k=${k}: im=${im[k]}, expected 0`)
 	}
@@ -206,7 +206,7 @@ test('fft: sine → imaginary component X[k] = -jN/2', () => {
 	for (const k of [1, 5, 63]) {
 		const input = new Float32Array(N)
 		for (let n = 0; n < N; n++) input[n] = Math.sin(2 * Math.PI * k * n / N)
-		const { re, im } = fft(input)
+		const [re, im] = fft(input)
 		assert(Math.abs(re[k]) < EPSILON, `sin k=${k}: re=${re[k]}, expected 0`)
 		assert(Math.abs(im[k] - (-N / 2)) < EPSILON, `sin k=${k}: im=${im[k]}, expected ${-N / 2}`)
 	}
@@ -216,7 +216,7 @@ test('fft: DC and Nyquist always have zero imaginary', () => {
 	for (const N of [4, 64, 512]) {
 		const input = new Float32Array(N)
 		for (let i = 0; i < N; i++) input[i] = Math.sin(i * 1.7) + Math.cos(i * 0.3)
-		const { im } = fft(input)
+		const [, im] = fft(input)
 		assert.equal(im[0], 0, `N=${N}: DC im must be 0`)
 		assert.equal(im[N / 2], 0, `N=${N}: Nyquist im must be 0`)
 	}
@@ -228,7 +228,7 @@ test('fft: magnitude matches rfft', () => {
 	for (let i = 0; i < N; i++) input[i] = Math.sin(i * 0.7) + Math.cos(i * 1.3)
 
 	const mag = new Float64Array(rfft(input))
-	const { re, im } = fft(input)
+	const [re, im] = fft(input)
 
 	const bSi = 2 / N
 	assert(Math.abs(mag[0] - Math.abs(bSi * re[0])) < EPSILON, `DC mismatch`)
@@ -240,10 +240,10 @@ test('fft: magnitude matches rfft', () => {
 
 test('fft: output buffer parameter', () => {
 	const N = 64
-	const out = { re: new Float64Array(N / 2 + 1), im: new Float64Array(N / 2 + 1) }
+	const out = [new Float64Array(N / 2 + 1), new Float64Array(N / 2 + 1)]
 	const ret = fft(new Float32Array(N).fill(1), out)
 	assert.equal(ret, out)
-	assert(Math.abs(out.re[0] - N) < EPSILON)
+	assert(Math.abs(out[0][0] - N) < EPSILON)
 })
 
 test('fft: view overwritten on repeated calls', () => {
@@ -254,10 +254,10 @@ test('fft: view overwritten on repeated calls', () => {
 		b[i] = Math.sin(2 * Math.PI * 10 * i / N)
 	}
 	const ra = fft(a)
-	assert(Math.abs(ra.re[5] - N / 2) < EPSILON)
+	assert(Math.abs(ra[0][5] - N / 2) < EPSILON)
 
 	fft(b) // overwrites ra since same N
 
-	assert(Math.abs(ra.re[5]) < EPSILON, 'ra.re[5] should be overwritten')
-	assert(Math.abs(ra.im[10] - (-N / 2)) < EPSILON, 'ra now reflects b')
+	assert(Math.abs(ra[0][5]) < EPSILON, 'ra[0][5] should be overwritten')
+	assert(Math.abs(ra[1][10] - (-N / 2)) < EPSILON, 'ra now reflects b')
 })

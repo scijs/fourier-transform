@@ -62,6 +62,11 @@ const { rfft: kissRfft } = await import('kissfft-wasm')
 const kissInput = new Float64Array(input)
 const kissRun = () => kissRfft(kissInput)
 
+// als-fft
+const AlsFFT = require('als-fft')
+const alsInput = Array.from(input)
+const alsRun = () => AlsFFT.fft(alsInput)
+
 // fft-js (naive Cooley-Tukey, educational)
 const fftjs2 = require('fft-js')
 const fftjs2Input = Array.from(input)
@@ -77,6 +82,7 @@ const libs = [
 	['ndarray-fft', ndfftRun],
 	['ooura', oouraRun],
 	['kissfft-wasm', kissRun],
+	['als-fft', alsRun],
 	['fft-js', fftjs2Run],
 ]
 

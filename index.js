@@ -17,7 +17,7 @@ function init(N) {
 	const spectrum = new Float64Array(half)
 	const im = new Float64Array(half + 1)
 	const re = x.subarray(0, half + 1) // zero-copy view into x
-	const complex = { re, im }
+	const complex = [re, im]
 	const bSi = 2 / N
 
 	// Precompute bit-reversal permutation table
@@ -221,8 +221,8 @@ export default function rfft(input, output) {
 /**
  * Compute complex spectrum of real-valued input (unnormalized DFT).
  * @param {ArrayLike<number>} input - length must be power of 2 (>= 2).
- * @param {{re: Float64Array, im: Float64Array}} [output] - Optional buffers (length N/2+1 each). If omitted, returns internal view.
- * @returns {{re: Float64Array, im: Float64Array}} Complex spectrum, N/2+1 bins (DC through Nyquist).
+ * @param {[Float64Array, Float64Array]} [output] - Optional [re, im] buffers (length N/2+1 each). If omitted, returns internal view.
+ * @returns {[Float64Array, Float64Array]} Complex spectrum [re, im], N/2+1 bins (DC through Nyquist).
  */
 export function fft(input, output) {
 	const entry = transform(input)
@@ -231,7 +231,7 @@ export function fft(input, output) {
 	const { x, complex } = entry
 
 	if (output) {
-		const re = output.re, im = output.im
+		const re = output[0], im = output[1]
 		for (let k = 0; k <= half; k++) re[k] = x[k]
 		im[0] = 0; im[half] = 0
 		for (let k = 1; k < half; k++) im[k] = x[N - k]
@@ -239,7 +239,7 @@ export function fft(input, output) {
 	}
 
 	// re is already a zero-copy view of x[0..half] — no copy needed
-	const im = complex.im
+	const im = complex[1]
 	im[0] = 0; im[half] = 0
 	for (let k = 1; k < half; k++) im[k] = x[N - k]
 

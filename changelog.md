@@ -11,7 +11,7 @@
 
 ## Added
 
-- `fft()` named export — returns complex DFT as `{ re, im }`, N/2+1 bins, unnormalized.
+- `fft()` named export — returns complex DFT as `[re, im]`, N/2+1 bins, unnormalized.
 - Optional output buffer parameter for both `rfft()` and `fft()`.
 
 ## Performance
