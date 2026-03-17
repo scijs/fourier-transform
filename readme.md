@@ -52,15 +52,17 @@ rfft(signal, out) // safe to keep
 N=4096 real-valued FFT, complex output, 20k iterations (lower is better):
 
 ```
-fft.js (indutny)          16.0µs/call         — radix-4
-fourier-transform         17.4µs/call   ×1.1  — split-radix
-ooura                     23.0µs/call   ×1.4  — Ooura C port
-ml-fft                    36.7µs/call   ×2.3
-dsp.js                    47.0µs/call   ×2.9  — original split-radix ancestor
-kissfft-wasm              48.5µs/call   ×3.0  — WASM KissFFT
-ndarray-fft               61.4µs/call   ×3.8
-fft-js                  2370.9µs/call  ×148.3  — naive recursive
+fft.js (indutny)          16.2µs  ×1.0  — radix-4, interleaved output
+fourier-transform         17.3µs  ×1.1  — split-radix, separate re/im
+ooura                     23.1µs  ×1.4  — Ooura C port
+ml-fft                    36.0µs  ×2.2
+dsp.js                    47.1µs  ×2.9  — our split-radix ancestor
+kissfft-wasm              49.4µs  ×3.1  — WASM KissFFT
+ndarray-fft               62.6µs  ×3.9
+fft-js                  2297.4µs  ×142   — naive recursive
 ```
+
+Raw transform speed is identical to fft.js. The ×1.1 gap is entirely the cost of returning separate `re`/`im` arrays vs interleaved output.
 
 `npm run benchmark` to reproduce.
 

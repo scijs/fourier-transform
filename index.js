@@ -15,10 +15,22 @@ function init(N) {
 	const half = N >>> 1
 	const x = new Float64Array(N)
 	const spectrum = new Float64Array(half)
-	const re = new Float64Array(half + 1)
 	const im = new Float64Array(half + 1)
+	const re = x.subarray(0, half + 1) // zero-copy view into x
 	const complex = { re, im }
 	const bSi = 2 / N
+
+	// Precompute bit-reversal permutation table
+	const bits = 31 - Math.clz32(N)
+	const perm = new Uint32Array(N)
+	for (let i = 0; i < N; i++) {
+		let rev = 0, v = i
+		for (let j = 0; j < bits; j++) {
+			rev = (rev << 1) | (v & 1)
+			v >>= 1
+		}
+		perm[i] = rev
+	}
 
 	// Count twiddle factors per stage
 	let total = 0, n2 = 2, nn = half
@@ -52,7 +64,7 @@ function init(N) {
 		si++
 	}
 
-	const entry = { x, spectrum, complex, bSi, tw, stages }
+	const entry = { x, spectrum, complex, bSi, tw, stages, perm }
 	cache.set(N, entry)
 	return entry
 }
@@ -71,9 +83,10 @@ function transform(input) {
 	if (N < 2 || (N & (N - 1))) throw Error('Input length must be a power of 2 (>= 2).')
 
 	const entry = getEntry(N)
-	const { x, tw, stages } = entry
+	const { x, tw, stages, perm } = entry
 
-	reverseBinPermute(N, x, input)
+	// Bit-reversal permutation via precomputed table
+	for (let i = 0; i < N; i++) x[i] = input[perm[i]]
 
 	// First pass: length-2 butterflies
 	for (let ix = 0, id = 4; ix < N; id *= 4) {
@@ -216,48 +229,19 @@ export function fft(input, output) {
 	const N = input.length
 	const half = N >>> 1
 	const { x, complex } = entry
-	const re = output ? output.re : complex.re
-	const im = output ? output.im : complex.im
 
-	re[0] = x[0]
-	im[0] = 0
-	for (let k = 1; k < half; k++) {
-		re[k] = x[k]
-		im[k] = x[N - k]
+	if (output) {
+		const re = output.re, im = output.im
+		for (let k = 0; k <= half; k++) re[k] = x[k]
+		im[0] = 0; im[half] = 0
+		for (let k = 1; k < half; k++) im[k] = x[N - k]
+		return output
 	}
-	re[half] = x[half]
-	im[half] = 0
 
-	return output || complex
-}
+	// re is already a zero-copy view of x[0..half] — no copy needed
+	const im = complex.im
+	im[0] = 0; im[half] = 0
+	for (let k = 1; k < half; k++) im[k] = x[N - k]
 
-function reverseBinPermute(N, dest, source) {
-	const halfSize = N >>> 1
-	const nm1 = N - 1
-
-	dest[0] = source[0]
-	if (halfSize < 2) { dest[nm1] = source[nm1]; return }
-
-	let i = 1, r = 0
-
-	do {
-		r += halfSize
-		dest[i] = source[r]
-		dest[r] = source[i]
-
-		i++
-
-		let h = halfSize << 1
-		while (h = h >> 1, !((r ^= h) & h)) {}
-
-		if (r >= i) {
-			dest[i] = source[r]
-			dest[r] = source[i]
-			dest[nm1 - i] = source[nm1 - r]
-			dest[nm1 - r] = source[nm1 - i]
-		}
-		i++
-	} while (i < halfSize)
-
-	dest[nm1] = source[nm1]
+	return complex
 }
