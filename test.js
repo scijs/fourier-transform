@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import rfft, { fft, irfft, cfft, cifft } from './index.js'
+import rfft, { fft, ifft, cfft, cifft } from './index.js'
 
 const EPSILON = 1e-6
 
@@ -262,22 +262,22 @@ test('fft: view overwritten on repeated calls', () => {
 	assert(Math.abs(ra[1][10] - (-N / 2)) < EPSILON, 'ra now reflects b')
 })
 
-// --- Inverse real FFT (irfft) ---
+// --- Inverse real FFT (ifft) ---
 
-test('irfft: rejects invalid input', () => {
+test('ifft: rejects invalid input', () => {
 	// bins=1 → N=0 (invalid)
-	assert.throws(() => irfft(new Float64Array(1), new Float64Array(1)))
+	assert.throws(() => ifft(new Float64Array(1), new Float64Array(1)))
 	// bins=4 → N=6 (not power of 2)
-	assert.throws(() => irfft(new Float64Array(4), new Float64Array(4)))
+	assert.throws(() => ifft(new Float64Array(4), new Float64Array(4)))
 })
 
-test('irfft(fft(x)) round-trip recovers signal', () => {
+test('ifft(fft(x)) round-trip recovers signal', () => {
 	for (const N of [4, 64, 256, 1024]) {
 		const input = new Float32Array(N)
 		for (let i = 0; i < N; i++) input[i] = Math.sin(i * 0.7) + Math.cos(i * 1.3)
 
 		const [re, im] = fft(input)
-		const recovered = irfft(re, im)
+		const recovered = ifft(re, im)
 
 		assert.equal(recovered.length, N)
 		for (let i = 0; i < N; i++)
@@ -285,62 +285,62 @@ test('irfft(fft(x)) round-trip recovers signal', () => {
 	}
 })
 
-test('irfft: DC spectrum → constant signal', () => {
+test('ifft: DC spectrum → constant signal', () => {
 	const N = 64, half = N / 2
 	const re = new Float64Array(half + 1)
 	const im = new Float64Array(half + 1)
 	re[0] = N // X[0] = N for DC=1
-	const out = irfft(re, im)
+	const out = ifft(re, im)
 	for (let i = 0; i < N; i++)
 		assert(Math.abs(out[i] - 1) < EPSILON, `i=${i}: ${out[i]}`)
 })
 
-test('irfft: cosine spectrum → cosine signal', () => {
+test('ifft: cosine spectrum → cosine signal', () => {
 	const N = 128, k0 = 5, half = N / 2
 	const re = new Float64Array(half + 1)
 	const im = new Float64Array(half + 1)
 	re[k0] = N / 2 // cos at bin k0
-	const out = irfft(re, im)
+	const out = ifft(re, im)
 	for (let i = 0; i < N; i++) {
 		const expected = Math.cos(2 * Math.PI * k0 * i / N)
 		assert(Math.abs(out[i] - expected) < EPSILON, `i=${i}: ${out[i]} vs ${expected}`)
 	}
 })
 
-test('irfft: sine spectrum → sine signal', () => {
+test('ifft: sine spectrum → sine signal', () => {
 	const N = 128, k0 = 5, half = N / 2
 	const re = new Float64Array(half + 1)
 	const im = new Float64Array(half + 1)
 	im[k0] = -N / 2 // sin at bin k0: X[k0] = -jN/2
-	const out = irfft(re, im)
+	const out = ifft(re, im)
 	for (let i = 0; i < N; i++) {
 		const expected = Math.sin(2 * Math.PI * k0 * i / N)
 		assert(Math.abs(out[i] - expected) < EPSILON, `i=${i}: ${out[i]} vs ${expected}`)
 	}
 })
 
-test('irfft: output buffer parameter', () => {
+test('ifft: output buffer parameter', () => {
 	const N = 64, half = N / 2
 	const re = new Float64Array(half + 1)
 	const im = new Float64Array(half + 1)
 	re[0] = N
 	const buf = new Float64Array(N)
-	const ret = irfft(re, im, buf)
+	const ret = ifft(re, im, buf)
 	assert.equal(ret, buf)
 	assert(Math.abs(buf[0] - 1) < EPSILON)
 })
 
-test('irfft: view overwritten on repeated calls', () => {
+test('ifft: view overwritten on repeated calls', () => {
 	const N = 64, half = N / 2
 
 	const re1 = new Float64Array(half + 1), im1 = new Float64Array(half + 1)
 	re1[0] = N // DC → all ones
-	const a = irfft(re1, im1)
+	const a = ifft(re1, im1)
 	assert(Math.abs(a[half] - 1) < EPSILON, 'DC: a[32] should be 1')
 
 	const re2 = new Float64Array(half + 1), im2 = new Float64Array(half + 1)
 	re2[3] = N / 2 // cosine at bin 3 → cos(2π·3·32/64) = cos(3π) = -1
-	irfft(re2, im2) // overwrites a
+	ifft(re2, im2) // overwrites a
 
 	assert(Math.abs(a[half] - (-1)) < EPSILON, 'a[32] should now be -1 (cosine at bin 3)')
 })

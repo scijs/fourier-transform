@@ -463,7 +463,7 @@ function inverseTransform(N, entry) {
  * @param {Float64Array} [output] - Optional buffer (length N). If omitted, returns internal view (overwritten on next call with same N).
  * @returns {Float64Array} Real time-domain signal, length N.
  */
-export function irfft(re, im, output) {
+export function ifft(re, im, output) {
 	const bins = re.length
 	const N = (bins - 1) << 1
 	if (N < 2 || (N & (N - 1))) throw Error('Input must have N/2+1 bins where N is power of 2 (>= 2).')

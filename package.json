@@ -20,7 +20,6 @@
     "dsp",
     "fft",
     "rfft",
-    "irfft",
     "ifft",
     "cfft",
     "dft"

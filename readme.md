@@ -47,7 +47,7 @@ Returns complex DFT as `[re, im]`, each `Float64Array` of length N/2+1 (DC throu
 - Unnormalized: `X[k] = sum( x[n] * e^(-j*2*pi*k*n/N) )`.
 - DC and Nyquist bins always have `im = 0` (real input).
 
-### `irfft(re, im, output?)` — named export
+### `ifft(re, im, output?)` — named export
 
 Inverse of `fft()` — recovers time-domain signal from complex spectrum. Returns `Float64Array` of length N.
 
@@ -58,7 +58,7 @@ Inverse of `fft()` — recovers time-domain signal from complex spectrum. Return
 ```js
 const [re, im] = fft(signal)
 // modify spectrum...
-const recovered = irfft(re, im)
+const recovered = ifft(re, im)
 ```
 
 ### `cfft(re, im)` — named export
@@ -71,7 +71,7 @@ In-place complex inverse FFT (1/N normalized). Same signature as `cfft`.
 
 ### View semantics
 
-`rfft`, `fft`, and `irfft` return internal cached buffers by default. The next call with the same N overwrites the previous result. Pass an output buffer to keep results across calls:
+`rfft`, `fft`, and `ifft` return internal cached buffers by default. The next call with the same N overwrites the previous result. Pass an output buffer to keep results across calls:
 
 ```js
 const out = new Float64Array(N / 2)
