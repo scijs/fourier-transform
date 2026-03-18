@@ -12,6 +12,8 @@
 ## Added
 
 - `fft()` named export — returns complex DFT as `[re, im]`, N/2+1 bins, unnormalized.
+- `irfft(re, im)` — inverse of `fft()`, native split-radix DIF inverse (~1.8x faster than complex IFFT approach).
+- `cfft(re, im)` / `cifft(re, im)` — in-place complex FFT and inverse FFT (radix-2 Cooley-Tukey).
 - Optional output buffer parameter for both `rfft()` and `fft()`.
 
 ## Performance

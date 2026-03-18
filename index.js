@@ -1,10 +1,10 @@
 /**
- * Real-valued split-radix FFT.
+ * FFT for real and complex signals.
  *
  * @module fourier-transform
  */
 
-const { sqrt, sin, cos, abs, SQRT1_2 } = Math
+const { sqrt, sin, cos, abs, SQRT1_2, SQRT2 } = Math
 const TWO_PI = 6.283185307179586
 
 // Per-size cached buffers and precomputed twiddle factors
@@ -218,6 +218,100 @@ export default function rfft(input, output) {
 	return out
 }
 
+// --- Complex radix-2 Cooley-Tukey FFT (in-place) ---
+
+const cCache = new Map()
+let cLastN = 0, cLastEntry = null
+
+function cInit(N) {
+	const bits = 31 - Math.clz32(N)
+	const perm = new Uint32Array(N)
+	for (let i = 0; i < N; i++) {
+		let rev = 0, v = i
+		for (let j = 0; j < bits; j++) { rev = (rev << 1) | (v & 1); v >>= 1 }
+		perm[i] = rev
+	}
+	// Separate forward/inverse twiddle tables (no per-butterfly dir multiply)
+	const twRe = new Float64Array(N)
+	const twFwd = new Float64Array(N)
+	const twInv = new Float64Array(N)
+	let ti = 0
+	for (let len = 2; len <= N; len <<= 1) {
+		const half = len >> 1, angle = TWO_PI / len
+		for (let j = 0; j < half; j++) {
+			const s = sin(j * angle)
+			twRe[ti] = cos(j * angle)
+			twFwd[ti] = -s
+			twInv[ti] = s
+			ti++
+		}
+	}
+	const entry = { perm, twRe, twFwd, twInv }
+	cCache.set(N, entry)
+	return entry
+}
+
+function cGetEntry(N) {
+	if (N === cLastN) return cLastEntry
+	const entry = cCache.get(N) || cInit(N)
+	cLastN = N
+	cLastEntry = entry
+	return entry
+}
+
+function cTransform(re, im, inverse) {
+	const N = re.length
+	if (N < 2 || (N & (N - 1))) throw Error('Length must be a power of 2 (>= 2).')
+	const entry = cGetEntry(N)
+	const { perm, twRe } = entry
+	const twIm = inverse ? entry.twInv : entry.twFwd
+
+	// Bit-reversal permutation (in-place swap)
+	for (let i = 0; i < N; i++) {
+		const j = perm[i]
+		if (i < j) {
+			let t = re[i]; re[i] = re[j]; re[j] = t
+			t = im[i]; im[i] = im[j]; im[j] = t
+		}
+	}
+
+	// Butterfly stages
+	let ti = 0
+	for (let len = 2; len <= N; len <<= 1) {
+		const half = len >> 1
+		for (let i = 0; i < N; i += len) {
+			for (let j = 0; j < half; j++) {
+				const wRe = twRe[ti + j], wIm = twIm[ti + j]
+				const a = i + j, b = a + half
+				const tRe = wRe * re[b] - wIm * im[b]
+				const tIm = wRe * im[b] + wIm * re[b]
+				re[b] = re[a] - tRe; im[b] = im[a] - tIm
+				re[a] += tRe; im[a] += tIm
+			}
+		}
+		ti += half
+	}
+
+	if (inverse) {
+		const inv = 1 / N
+		for (let i = 0; i < N; i++) { re[i] *= inv; im[i] *= inv }
+	}
+}
+
+/**
+ * In-place complex forward FFT (unnormalized).
+ * @param {Float64Array} re - Real parts (length must be power of 2, >= 2).
+ * @param {Float64Array} im - Imaginary parts (same length).
+ */
+export function cfft(re, im) { cTransform(re, im, false) }
+
+/**
+ * In-place complex inverse FFT (1/N normalized).
+ * @param {Float64Array} re - Real parts (length must be power of 2, >= 2).
+ * @param {Float64Array} im - Imaginary parts (same length).
+ */
+export function cifft(re, im) { cTransform(re, im, true) }
+
 /**
  * Compute complex spectrum of real-valued input (unnormalized DFT).
  * @param {ArrayLike<number>} input - length must be power of 2 (>= 2).
@@ -244,4 +338,153 @@ export function fft(input, output) {
 	for (let k = 1; k < half; k++) im[k] = x[N - k]
 
 	return complex
+}
+
+// Inverse split-radix DIF core — mirror of forward DIT transform()
+function inverseTransform(N, entry) {
+	const { x, tw, stages, perm } = entry
+	const numStages = stages.length
+
+	// DIF: butterflies from large n2 to small (reverse of forward)
+	let n2 = N << 1
+	for (let s = 0; s < numStages; s++) {
+		n2 >>= 1
+		const n4 = n2 >>> 2
+		const n8 = n4 >>> 1
+		const si = numStages - 1 - s
+
+		// Zero-angle butterflies
+		let ix = 0, id = n2 << 1
+		do {
+			for (let i0 = ix; i0 < N; i0 += id) {
+				const i1 = i0, i2 = i1 + n4, i3 = i2 + n4, i4 = i3 + n4
+
+				let t1 = x[i1] - x[i3]
+				x[i1] += x[i3]
+				x[i2] += x[i2]
+				x[i4] += x[i4]
+				x[i3] = t1 - x[i4]
+				x[i4] += t1
+			}
+			ix = (id << 1) - n2
+			id <<= 2
+		} while (ix < N)
+
+		// SQRT2 section (only when n8 >= 1, i.e. n4 !== 1)
+		if (n8 >= 1) {
+			ix = 0; id = n2 << 1
+			do {
+				for (let i0 = ix; i0 < N; i0 += id) {
+					const j1 = i0 + n8, j2 = j1 + n4, j3 = j2 + n4, j4 = j3 + n4
+
+					let t1 = x[j1] - x[j2]
+					x[j1] += x[j2]
+					let t2 = x[j4] + x[j3]
+					x[j2] = x[j4] - x[j3]
+					t2 = -t2 * SQRT2
+					t1 *= SQRT2
+					x[j3] = t2 + t1
+					x[j4] = t2 - t1
+				}
+				ix = (id << 1) - n2
+				id <<= 2
+			} while (ix < N)
+		}
+
+		// Twiddle factor butterflies (same twiddles, inverse operations)
+		const { offset, count } = stages[si]
+		for (let j = 0; j < count; j++) {
+			const ti = (offset + j) << 2
+			const cc1 = tw[ti], ss1 = tw[ti + 1], cc3 = tw[ti + 2], ss3 = tw[ti + 3]
+
+			ix = 0; id = n2 << 1
+			do {
+				for (let i0 = ix; i0 < N; i0 += id) {
+					const i1 = i0 + j + 1
+					const i2 = i1 + n4
+					const i3 = i2 + n4
+					const i4 = i3 + n4
+					const i5 = i0 + n4 - j - 1
+					const i6 = i5 + n4
+					const i7 = i6 + n4
+					const i8 = i7 + n4
+
+					let t1 = x[i1] - x[i6]
+					x[i1] += x[i6]
+					let t2 = x[i5] - x[i2]
+					x[i5] += x[i2]
+					let t3 = x[i8] + x[i3]
+					x[i6] = x[i8] - x[i3]
+					let t4 = x[i4] + x[i7]
+					x[i2] = x[i4] - x[i7]
+
+					const t5 = t1 - t4
+					t1 += t4
+					t4 = t2 - t3
+					t2 += t3
+
+					x[i7] = t5 * ss1 - t4 * cc1
+					x[i3] = t5 * cc1 + t4 * ss1
+					x[i4] = t1 * cc3 - t2 * ss3
+					x[i8] = t1 * ss3 + t2 * cc3
+				}
+				ix = (id << 1) - n2
+				id <<= 2
+			} while (ix < N)
+		}
+	}
+
+	// Length-2 butterflies (self-inverse up to scaling)
+	for (let ix = 0, id = 4; ix < N; id *= 4) {
+		for (let i0 = ix; i0 < N; i0 += id) {
+			const t = x[i0] - x[i0 + 1]
+			x[i0] += x[i0 + 1]
+			x[i0 + 1] = t
+		}
+		ix = 2 * (id - 1)
+	}
+
+	// Bit-reversal permutation (in-place swap)
+	for (let i = 0; i < N; i++) {
+		const j = perm[i]
+		if (i < j) { const t = x[i]; x[i] = x[j]; x[j] = t }
+	}
+
+	// Scale by 1/N
+	const inv = 1 / N
+	for (let i = 0; i < N; i++) x[i] *= inv
+}
+
+/**
+ * Inverse real FFT — recover time-domain signal from complex spectrum.
+ * Uses native split-radix DIF algorithm (no complex FFT overhead).
+ * @param {Float64Array} re - Real parts (length N/2+1).
+ * @param {Float64Array} im - Imaginary parts (length N/2+1).
+ * @param {Float64Array} [output] - Optional buffer (length N). If omitted, returns internal view (overwritten on next call with same N).
+ * @returns {Float64Array} Real time-domain signal, length N.
+ */
+export function irfft(re, im, output) {
+	const bins = re.length
+	const N = (bins - 1) << 1
+	if (N < 2 || (N & (N - 1))) throw Error('Input must have N/2+1 bins where N is power of 2 (>= 2).')
+
+	const entry = getEntry(N)
+	const { x } = entry
+	const half = N >>> 1
+
+	// Pack into half-complex format: x[k]=Re(X[k]), x[N-k]=Im(X[k])
+	x[0] = re[0]
+	x[half] = re[half]
+	for (let k = 1; k < half; k++) {
+		x[k] = re[k]
+		x[N - k] = im[k]
+	}
+
+	inverseTransform(N, entry)
+
+	if (output) {
+		for (let i = 0; i < N; i++) output[i] = x[i]
+		return output
+	}
+	return x
 }
