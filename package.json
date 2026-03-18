@@ -1,6 +1,6 @@
 {
   "name": "fourier-transform",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Minimalistic and efficient FFT implementation",
   "type": "module",
   "exports": "./index.js",
@@ -12,7 +12,9 @@
     "type": "git",
     "url": "git+https://github.com/scijs/fourier-transform.git"
   },
-  "files": ["index.js"],
+  "files": [
+    "index.js"
+  ],
   "keywords": [
     "fourier",
     "dsp",
