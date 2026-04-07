@@ -3,6 +3,7 @@
   "version": "2.2.0",
   "description": "Minimalistic and efficient FFT implementation",
   "type": "module",
+  "sideEffects": false,
   "exports": "./index.js",
   "scripts": {
     "test": "node --test test.js",
