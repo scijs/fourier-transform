@@ -4,9 +4,12 @@
   "description": "Minimalistic and efficient FFT implementation",
   "type": "module",
   "sideEffects": false,
-  "exports": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./stft": "./stft.js"
+  },
   "scripts": {
-    "test": "node --test test.js",
+    "test": "node --test test/rfft.js test/fft.js test/stft.js",
     "benchmark": "node benchmark/run.js"
   },
   "repository": {
@@ -14,7 +17,8 @@
     "url": "git+https://github.com/scijs/fourier-transform.git"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "stft.js"
   ],
   "keywords": [
     "fourier",
@@ -23,7 +27,10 @@
     "rfft",
     "ifft",
     "cfft",
-    "dft"
+    "dft",
+    "stft",
+    "istft",
+    "short-time-fourier-transform"
   ],
   "author": "Dmitry Iv. <dfcreative@gmail.com>",
   "license": "MIT",
@@ -40,6 +47,7 @@
     "ml-fft": "^1.3.5",
     "ndarray": "^1.0.19",
     "ndarray-fft": "^1.0.3",
-    "ooura": "^2.1.6"
+    "ooura": "^2.1.6",
+    "tst": "^9.4.0"
   }
 }

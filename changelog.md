@@ -1,3 +1,23 @@
+# 2.3.0
+
+## Added
+
+- `fourier-transform/stft` subpath export — STFT and inverse STFT.
+- `stft(signal, opts)` — analysis-only STFT returning frames with `re`, `im`, `mag`, `phase`, `time`.
+- `istft(frames, opts)` — synthesis from STFT frames.
+- `stftBatch(data, process, opts)` — batch STFT with per-frame processing callback and overlap-add synthesis.
+- `stftStream(process, opts)` — streaming STFT with processing callback.
+- `stftAnalysisStream(opts)` — streaming analysis-only STFT.
+- Zero-padded boundaries for perfect reconstruction.
+- Hann window with per-size cache.
+- Compatible with `pitch-shift`, `time-stretch`, and `pitch-detection` patterns.
+
+# 2.2.0
+
+## Added
+
+- `cifft(re, im)` — in-place complex inverse FFT (1/N normalized).
+
 # 2.1.0
 
 ## Breaking

@@ -69,6 +69,94 @@ In-place complex forward FFT (unnormalized). Both `re` and `im` must be `Float64
 
 In-place complex inverse FFT (1/N normalized). Same signature as `cfft`.
 
+## STFT
+
+```js
+import { stft, istft, stftBatch, stftStream, stftAnalysisStream } from 'fourier-transform/stft'
+```
+
+### `stft(signal, opts?)` — analysis
+
+Returns an array of frames, each with `{ re, im, mag, phase, time }`.
+
+- `signal` — `Float32Array`, `Float64Array`, or plain `Array`.
+- `opts.frameSize` — FFT size, power of 2. Default: `2048`.
+- `opts.hopSize` — hop between frames. Default: `frameSize / 4`.
+- `time` is the sample index of the frame centre in the original signal.
+- Zero-padded by `frameSize` at front and back so edge samples are fully windowed.
+
+```js
+const frames = stft(waveform, { frameSize: 2048, hopSize: 512 })
+for (const f of frames) {
+  console.log(f.time, f.mag[100]) // time in samples, magnitude at bin 100
+}
+```
+
+### `istft(frames, opts?)` — synthesis
+
+Reconstructs a time-domain signal from STFT frames.
+
+- `frames` — array of `{ mag, phase, time? }` or `{ re, im, time? }` objects.
+- `opts.signalLength` — expected output length. Inferred from last frame if omitted.
+  - When inferred, the tail may include padding; pass `signalLength` for exact control.
+- Returns `Float64Array`.
+- If `re`/`im` are present, they are used directly (no polar round-trip). Otherwise `mag`/`phase` are converted to cartesian.
+
+```js
+const recovered = istft(frames, { frameSize: 2048, hopSize: 512, signalLength: waveform.length })
+```
+
+### `stftBatch(data, process, opts?)` — batch with callback
+
+Processes each frame through a callback and overlap-adds the result.
+
+- `process(mag, phase, state, ctx)` → `{ mag, phase }`
+  - `mag`, `phase` — `Float64Array(half + 1)`
+  - `state` — persistent object across frames
+  - `ctx` — `{ N, half, hop, anaHop, synHop, freqPerBin, frameStart, sampleRate, opts }`
+    - `ctx.frameStart` — sample index of the frame start in the original signal. Negative at boundaries due to zero-padding.
+    - `ctx.opts` — cloned copy of `opts`. Use this to pass custom parameters (e.g. `ratio`, `ratioFn`) through to your process callback.
+- `opts.anaHop` — analysis hop (default: `hopSize`).
+- `opts.synHop` — synthesis hop (default: `hopSize`). When `anaHop !== synHop`, the output is time-stretched or compressed.
+- Returns `Float32Array` of length `round(data.length * synHop / anaHop)` (same as input when `anaHop === synHop`).
+
+```js
+const result = stftBatch(signal, (mag, phase, state, ctx) => {
+  // Simple spectral gate
+  for (let k = 0; k < mag.length; k++) if (mag[k] < 0.1) mag[k] = 0
+  return { mag, phase }
+}, { frameSize: 2048, hopSize: 512 })
+```
+
+### `stftStream(process, opts?)` — streaming with callback
+
+Streaming version of `stftBatch`. Returns `{ write(chunk), flush() }`.
+
+- Supports `opts.anaHop` / `opts.synHop` for time-stretching in streaming context.
+
+```js
+const stream = stftStream((mag, phase) => ({ mag, phase }), { frameSize: 2048 })
+
+for (const chunk of audioChunks) {
+  const processed = stream.write(chunk)
+  // emit processed...
+}
+const tail = stream.flush()
+```
+
+### `stftAnalysisStream(opts?)` — streaming analysis
+
+Streaming version of `stft`. Returns `{ write(chunk), flush() }` that emit frames.
+
+- Supports `opts.anaHop` for non-uniform analysis spacing.
+
+```js
+const stream = stftAnalysisStream({ frameSize: 2048, hopSize: 512 })
+const frames = stream.write(chunk1)
+frames.push(...stream.write(chunk2))
+frames.push(...stream.flush())
+```
+
 ### View semantics
 
 `rfft`, `fft`, and `ifft` return internal cached buffers by default. The next call with the same N overwrites the previous result. Pass an output buffer to keep results across calls:
