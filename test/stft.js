@@ -542,3 +542,56 @@ t('winSqFloor is exported and caches results', () => {
 	if (f1 !== f2) throw new Error('winSqFloor should return cached value')
 	if (f1 <= 0) throw new Error('winSqFloor should be positive')
 })
+
+// --- Time-stretch mapping & fractional hops ---
+
+t('stftBatch stretch maps input time t to t*factor (center-aligned, no lag)', () => {
+	// Tone burst gated [0.4s, 0.9s) — the pre-fix engine lagged output by (N/2)(factor-1).
+	const sr = 44100, n = sr * 2, from = Math.floor(0.4 * sr)
+	const signal = new Float32Array(n)
+	for (let i = from; i < Math.floor(0.9 * sr); i++) signal[i] = Math.sin(PI2 * 440 * i / sr) * 0.8
+
+	for (const factor of [0.5, 2]) {
+		const out = stftBatch(signal, (mag, phase) => ({ mag, phase }), {
+			frameSize: 2048, anaHop: 512 / factor, synHop: 512,
+		})
+		if (out.length !== Math.round(n * factor)) throw new Error(`length ${out.length} != ${Math.round(n * factor)}`)
+		// envelope half-max crossing
+		const win = 256, nWin = Math.floor(out.length / win)
+		let maxRms = 0
+		const env = new Float64Array(nWin)
+		for (let k = 0; k < nWin; k++) {
+			let s = 0
+			for (let i = 0; i < win; i++) { const v = out[k * win + i]; s += v * v }
+			env[k] = Math.sqrt(s / win)
+			if (env[k] > maxRms) maxRms = env[k]
+		}
+		let onset = -1
+		for (let k = 0; k < nWin; k++) if (env[k] > maxRms * 0.5) { onset = k * win; break }
+		const ideal = from * factor
+		if (Math.abs(onset - ideal) > 512) throw new Error(`${factor}x: onset ${onset}, ideal ${ideal}`)
+	}
+})
+
+t('stftStream fractional anaHop (1.5x stretch) stays finite and carries the tone', () => {
+	// Regression: the engine stepped frame positions by a fractional hop and read
+	// fractional indices -> NaN for every non-integer-hop factor.
+	const N = 2048, sr = 44100, n = 32768, factor = 1.5
+	const signal = new Float32Array(n)
+	for (let i = 0; i < n; i++) signal[i] = Math.sin(PI2 * 440 * i / sr) * 0.8
+
+	const stream = stftStream((mag, phase) => ({ mag, phase }), {
+		frameSize: N, anaHop: (N >> 2) / factor, synHop: N >> 2,
+	})
+	let total = 0, energy = 0, bad = 0
+	const consume = (out) => {
+		for (let j = 0; j < out.length; j++) { if (!Number.isFinite(out[j])) bad++; energy += out[j] * out[j] }
+		total += out.length
+	}
+	for (let i = 0; i < n; i += 1024) consume(stream.write(signal.subarray(i, Math.min(i + 1024, n))))
+	consume(stream.flush())
+
+	if (bad) throw new Error(`${bad} non-finite samples`)
+	if (Math.abs(total - n * factor) > N) throw new Error(`length ${total}, expected ~${n * factor}`)
+	if (Math.sqrt(energy / total) < 0.3) throw new Error('lost signal energy')
+})

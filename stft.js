@@ -85,26 +85,13 @@ function synthesizeFrame(re, im, pos, win, out, norm, sc) {
 function makeFrame(re, im, time, half) {
 	const reCopy = new Float64Array(re)
 	const imCopy = new Float64Array(im)
-	let _mag = null, _phase = null
-	return {
-		re: reCopy,
-		im: imCopy,
-		get mag() {
-			if (!_mag) {
-				_mag = new Float64Array(half + 1)
-				for (let k = 0; k <= half; k++) _mag[k] = Math.sqrt(reCopy[k] * reCopy[k] + imCopy[k] * imCopy[k])
-			}
-			return _mag
-		},
-		get phase() {
-			if (!_phase) {
-				_phase = new Float64Array(half + 1)
-				for (let k = 0; k <= half; k++) _phase[k] = Math.atan2(imCopy[k], reCopy[k])
-			}
-			return _phase
-		},
-		time,
+	const mag = new Float64Array(half + 1)
+	const phase = new Float64Array(half + 1)
+	for (let k = 0; k <= half; k++) {
+		mag[k] = Math.sqrt(reCopy[k] * reCopy[k] + imCopy[k] * imCopy[k])
+		phase[k] = Math.atan2(imCopy[k], reCopy[k])
 	}
+	return { re: reCopy, im: imCopy, mag, phase, time }
 }
 
 // --- Analysis-only STFT ---
@@ -251,10 +238,15 @@ export function stftBatch(data, process, opts) {
 	const win = hannWindow(N)
 	const sc = scratch(N, half)
 	const pad = N
+	// Analysis frame k starts at k·anaHop − pad; synthesis frame k at k·synHop − pOut.
+	// pOut = (N/2)(synHop/anaHop + 1) makes frame CENTERS map c → c·synHop/anaHop, so
+	// input time t lands at exactly t·factor (no constant lag, no tail truncation).
+	// At synHop === anaHop this reduces to pOut === pad — plain OLA is unchanged.
+	const pOut = Math.round(half * (synHop / anaHop + 1))
 	const inLen = data.length
 	const outLen = Math.round(inLen * synHop / anaHop)
 	const paddedInLen = inLen + pad * 2
-	const paddedOutLen = outLen + pad * 2
+	const paddedOutLen = outLen + pOut * 2
 
 	const out = new Float64Array(paddedOutLen)
 	const norm = new Float64Array(paddedOutLen)
@@ -295,7 +287,7 @@ export function stftBatch(data, process, opts) {
 	const floor = winSqFloor(win, synHop)
 	const result = new Float32Array(outLen)
 	for (let i = 0; i < outLen; i++) {
-		const j = i + pad
+		const j = i + pOut
 		const n = norm[j] < floor ? floor : norm[j]
 		result[i] = n > 1e-10 ? out[j] / n : 0
 	}
@@ -334,15 +326,18 @@ export function stftStream(process, opts) {
 	const win = hannWindow(N)
 	const sc = scratch(N, half)
 	const pad = N
+	// Same center-aligned mapping as stftBatch: synthesis frame k sits at
+	// k·synHop − pOut so input time t lands at t·synHop/anaHop exactly.
+	const pOut = Math.round(half * (synHop / anaHop + 1))
 	const floor = winSqFloor(win, synHop)
 
 	let outBuf = new Float64Array(N * 8)
 	let normBuf = new Float64Array(N * 8)
-	let outStart = -pad
+	let outStart = -pOut
 	let emitted = 0
 	let totalIn = 0
 	let state = {}
-	let nextSynPos = -pad
+	let nextSynPos = -pOut
 	const ctx = {
 		N, half, hop,
 		anaHop, synHop,
@@ -414,16 +409,16 @@ export function stftStream(process, opts) {
 
 	return {
 		write(chunk) {
-			if (engine._flushed) throw new Error('stftStream already flushed')
+			if (engine._flushed()) throw new Error('stftStream already flushed')
 			totalIn += chunk.length
 			engine.write(chunk)
-			// Safe emission: scale totalIn to synthesis coords, then back off one
-			// frame-pad in synthesis coords (not analysis — pad is a sample-count
-			// safety margin, not a hop-count).
-			return emit(Math.round(totalIn * synHop / anaHop) - pad)
+			// Safe emission: the deepest-processed frame starts at ≈(totalIn − N) in
+			// analysis coords, which synthesizes at totalIn·factor − pOut — everything
+			// before that is final. Back off pOut in synthesis coords.
+			return emit(Math.round(totalIn * synHop / anaHop) - pOut)
 		},
 		flush() {
-			if (engine._flushed) return new Float32Array(0)
+			if (engine._flushed()) return new Float32Array(0)
 			engine.flush()
 			return emit(Math.round(totalIn * synHop / anaHop))
 		},
@@ -462,14 +457,17 @@ function _stftStreamEngine(opts, onFrame) {
 	}
 
 	function processFrames(limitPos) {
-		while (nextFramePos + N <= limitPos) {
-			const [re, im] = analyzeFrame(buf, nextFramePos, win, sc)
-			onFrame(re, im, streamOffset + nextFramePos - pad + half)
+		// hop may be fractional (stftStream passes anaHop = hopSize/factor): keep the
+		// accumulator exact and round only the read position, mirroring stftBatch.
+		while (Math.round(nextFramePos) + N <= limitPos) {
+			const pos = Math.round(nextFramePos)
+			const [re, im] = analyzeFrame(buf, pos, win, sc)
+			onFrame(re, im, streamOffset + pos - pad + half)
 			nextFramePos += hop
 		}
 
 		if (nextFramePos > N * 2) {
-			const keep = nextFramePos - N
+			const keep = Math.floor(nextFramePos) - N
 			buf.copyWithin(0, keep, bufLen)
 			bufLen -= keep
 			nextFramePos -= keep
@@ -493,7 +491,7 @@ function _stftStreamEngine(opts, onFrame) {
 			bufLen += pad
 			processFrames(bufLen)
 		},
-		get _flushed() { return flushed },
+		_flushed() { return flushed },
 	}
 }
 

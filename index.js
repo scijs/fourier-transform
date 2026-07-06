@@ -4,7 +4,6 @@
  * @module fourier-transform
  */
 
-const { sqrt, sin, cos, abs, SQRT1_2, SQRT2 } = Math
 const TWO_PI = 6.283185307179586
 
 // Per-size cached buffers and precomputed twiddle factors
@@ -54,7 +53,7 @@ function init(N) {
 		const off = stages[si].offset << 2
 		for (let j = 1; j < n8; j++) {
 			const a = j * e
-			const s = sin(a), c = cos(a)
+			const s = Math.sin(a), c = Math.cos(a)
 			const idx = off + ((j - 1) << 2)
 			tw[idx] = c
 			tw[idx + 1] = s
@@ -121,8 +120,8 @@ function transform(input) {
 
 					t1 = x[i3] + x[i4]
 					let t2 = x[i3] - x[i4]
-					t1 = -t1 * SQRT1_2
-					t2 *= SQRT1_2
+					t1 = -t1 * Math.SQRT1_2
+					t2 *= Math.SQRT1_2
 
 					const st1 = x[i2]
 					x[i4] = t1 + st1
@@ -211,9 +210,9 @@ export default function rfft(input, output) {
 	let i = N >>> 1
 	while (--i) {
 		const rval = x[i], ival = x[N - i]
-		out[i] = bSi * sqrt(rval * rval + ival * ival)
+		out[i] = bSi * Math.sqrt(rval * rval + ival * ival)
 	}
-	out[0] = abs(bSi * x[0])
+	out[0] = Math.abs(bSi * x[0])
 
 	return out
 }
@@ -239,8 +238,8 @@ function cInit(N) {
 	for (let len = 2; len <= N; len <<= 1) {
 		const half = len >> 1, angle = TWO_PI / len
 		for (let j = 0; j < half; j++) {
-			const s = sin(j * angle)
-			twRe[ti] = cos(j * angle)
+			const s = Math.sin(j * angle)
+			twRe[ti] = Math.cos(j * angle)
 			twFwd[ti] = -s
 			twInv[ti] = s
 			ti++
@@ -370,7 +369,7 @@ function inverseTransform(N, entry) {
 			id <<= 2
 		} while (ix < N)
 
-		// SQRT2 section (only when n8 >= 1, i.e. n4 !== 1)
+		// Math.SQRT2 section (only when n8 >= 1, i.e. n4 !== 1)
 		if (n8 >= 1) {
 			ix = 0; id = n2 << 1
 			do {
@@ -381,8 +380,8 @@ function inverseTransform(N, entry) {
 					x[j1] += x[j2]
 					let t2 = x[j4] + x[j3]
 					x[j2] = x[j4] - x[j3]
-					t2 = -t2 * SQRT2
-					t1 *= SQRT2
+					t2 = -t2 * Math.SQRT2
+					t1 *= Math.SQRT2
 					x[j3] = t2 + t1
 					x[j4] = t2 - t1
 				}
