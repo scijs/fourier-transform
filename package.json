@@ -1,6 +1,6 @@
 {
   "name": "fourier-transform",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Minimalistic and efficient FFT implementation",
   "type": "module",
   "sideEffects": false,
