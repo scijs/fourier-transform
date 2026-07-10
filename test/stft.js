@@ -595,3 +595,52 @@ t('stftStream fractional anaHop (1.5x stretch) stays finite and carries the tone
 	if (Math.abs(total - n * factor) > N) throw new Error(`length ${total}, expected ~${n * factor}`)
 	if (Math.sqrt(energy / total) < 0.3) throw new Error('lost signal energy')
 })
+
+t('stftBatch: function hops returning constants match the constant path', () => {
+	const sr = 44100, n = sr, d = new Float32Array(n)
+	for (let i = 0; i < n; i++) d[i] = 0.5 * Math.sin(2 * Math.PI * 440 * i / sr)
+	const ident = (mag, phase) => ({ mag, phase })
+	const cst = stftBatch(d, ident, { frameSize: 2048, anaHop: 256, synHop: 512 })
+	const fnc = stftBatch(d, ident, { frameSize: 2048, anaHop: () => 256, synHop: () => 512 })
+	const overlap = Math.min(cst.length, fnc.length)
+	for (let i = 0; i < overlap; i++)
+		if (Math.abs(cst[i] - fnc[i]) > 1e-9) throw new Error(`sample ${i} differs: ${cst[i]} vs ${fnc[i]}`)
+	if (Math.abs(fnc.length - cst.length) > 2048) throw new Error(`fn-path length far off: ${fnc.length} vs ${cst.length}`)
+})
+
+t('stftBatch + stftStream: sliding synHop integrates (factor 1→2 ≈ 1.5× length)', () => {
+	const sr = 44100, n = sr, d = new Float32Array(n)
+	for (let i = 0; i < n; i++) d[i] = 0.5 * Math.sin(2 * Math.PI * 440 * i / sr)
+	const ident = (mag, phase) => ({ mag, phase })
+	const synFn = fs => 256 + 256 * Math.min(1, Math.max(0, fs / n))
+
+	const batch = stftBatch(d, ident, { frameSize: 2048, anaHop: 256, synHop: synFn })
+	if (Math.abs(batch.length / n - 1.5) > 0.05) throw new Error(`batch length ratio ${batch.length / n}`)
+	for (const v of batch) if (!Number.isFinite(v)) throw new Error('non-finite batch output')
+
+	const s = stftStream(ident, { frameSize: 2048, anaHop: 256, synHop: synFn })
+	let total = 0, bad = 0
+	const consume = c => { total += c.length; for (const v of c) if (!Number.isFinite(v)) bad++ }
+	for (let i = 0; i < n; i += 1024) consume(s.write(d.subarray(i, Math.min(i + 1024, n))))
+	consume(s.flush())
+	if (bad) throw new Error(`${bad} non-finite stream samples`)
+	if (Math.abs(total / n - 1.5) > 0.05) throw new Error(`stream length ratio ${total / n}`)
+})
+
+t('stftStream: variable anaHop function (sliding analysis cadence) stays finite', () => {
+	const sr = 44100, n = sr >> 1, d = new Float32Array(n)
+	for (let i = 0; i < n; i++) d[i] = 0.5 * Math.sin(2 * Math.PI * 440 * i / sr)
+	const ident = (mag, phase) => ({ mag, phase })
+	// factor 1→2 expressed on the analysis side: anaHop 512→256, synHop fixed 512
+	const anaFn = fs => 512 / (1 + Math.min(1, Math.max(0, fs / n)))
+	const s = stftStream(ident, { frameSize: 2048, anaHop: anaFn, synHop: 512 })
+	let total = 0
+	for (let i = 0; i < n; i += 1024) {
+		const c = s.write(d.subarray(i, Math.min(i + 1024, n)))
+		for (const v of c) if (!Number.isFinite(v)) throw new Error('non-finite')
+		total += c.length
+	}
+	total += s.flush().length
+	// mean factor 512/anaHop over source ≈ ∫(1+t) = 1.5
+	if (Math.abs(total / n - 1.5) > 0.08) throw new Error(`length ratio ${total / n}, expected ≈1.5`)
+})
