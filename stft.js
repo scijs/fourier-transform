@@ -510,7 +510,9 @@ function _stftStreamEngine(opts, onFrame) {
 		}
 
 		if (nextFramePos > N * 2) {
-			const keep = Math.floor(nextFramePos) - N
+			// a hop longer than the frame can put the next frame past the buffered input:
+			// drop at most what is buffered, the rest of the gap stays in nextFramePos
+			const keep = Math.min(Math.floor(nextFramePos) - N, bufLen)
 			buf.copyWithin(0, keep, bufLen)
 			bufLen -= keep
 			nextFramePos -= keep

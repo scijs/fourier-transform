@@ -644,3 +644,23 @@ t('stftStream: variable anaHop function (sliding analysis cadence) stays finite'
 	// mean factor 512/anaHop over source ≈ ∫(1+t) = 1.5
 	if (Math.abs(total / n - 1.5) > 0.08) throw new Error(`length ratio ${total / n}, expected ≈1.5`)
 })
+
+t('stftStream: analysis hop longer than the frame (strong compression) streams ≡ batch', () => {
+	// The input compaction dropped floor(nextFramePos) − N samples even when fewer were
+	// buffered: bufLen went negative and the next write threw (RangeError)
+	const n = 44100, d = new Float32Array(n)
+	for (let i = 0; i < n; i++) d[i] = 0.5 * Math.sin(2 * Math.PI * 330 * i / 44100)
+	const ident = (mag, phase) => ({ mag, phase })
+	const opts = { frameSize: 1024, synHop: 256, anaHop: 256 / 0.1 }        // anaHop 2560 > N
+	const batch = stftBatch(d, ident, opts)
+	for (const size of [997, 64, 3000]) {
+		const s = stftStream(ident, opts), parts = []
+		for (let i = 0; i < n; i += size) parts.push(s.write(d.subarray(i, Math.min(i + size, n))))
+		parts.push(s.flush())
+		const out = new Float32Array(parts.reduce((a, p) => a + p.length, 0))
+		let o = 0; for (const p of parts) { out.set(p, o); o += p.length }
+		if (out.length !== batch.length) throw new Error(`chunks ${size}: length ${out.length} ≠ batch ${batch.length}`)
+		let m = 0; for (let i = 0; i < out.length; i++) m = Math.max(m, Math.abs(out[i] - batch[i]))
+		if (m > 1e-6) throw new Error(`chunks ${size}: max deviation ${m}`)
+	}
+})
