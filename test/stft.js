@@ -216,6 +216,24 @@ t('stftStream identity process returns same signal', () => {
 	if (maxErr >= EPSILON) throw new Error(`Max stream identity error ${maxErr} exceeds ${EPSILON}`)
 })
 
+t('complex frames: an identity process returns the signal, batch and stream, as the polar path does', () => {
+	const N = 1024, hop = 256, len = 12000, sig = new Float32Array(len)
+	for (let i = 0; i < len; i++) sig[i] = Math.sin(i * 0.05) * 0.6 + Math.sin(i * 0.31) * 0.2
+	const batch = stftBatch(sig, (re, im) => ({ re, im }), { frameSize: N, hopSize: hop, complex: true })
+	const polar = stftBatch(sig, (mag, phase) => ({ mag, phase }), { frameSize: N, hopSize: hop })
+	const s = stftStream((re, im) => ({ re, im }), { frameSize: N, hopSize: hop, complex: true }), parts = []
+	for (let o = 0; o < len; o += 700) parts.push(s.write(sig.subarray(o, o + 700)))
+	parts.push(s.flush())
+	const stream = new Float32Array(parts.reduce((n, p) => n + p.length, 0))
+	let q = 0
+	for (const p of parts) { stream.set(p, q); q += p.length }
+	if (batch.length !== len || stream.length !== len) throw new Error(`lengths ${batch.length}, ${stream.length}`)
+	for (let i = 0; i < len; i++) {
+		if (Math.abs(batch[i] - sig[i]) >= 1e-5 || Math.abs(stream[i] - sig[i]) >= 1e-5) throw new Error(`i=${i}: ${batch[i]}, ${stream[i]} vs ${sig[i]}`)
+		if (Math.abs(batch[i] - polar[i]) >= 1e-6) throw new Error(`i=${i}: complex ${batch[i]} vs polar ${polar[i]}`)
+	}
+})
+
 t('stftStream rejects write after flush', () => {
 	const stream = stftStream((mag, phase) => ({ mag, phase }), { frameSize: 64, hopSize: 16 })
 	stream.flush()

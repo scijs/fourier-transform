@@ -124,6 +124,18 @@ t('ifft(fft(x)) round-trip recovers signal', () => {
 	}
 })
 
+t('ifft: into a separate buffer, into its own returned buffer, or none — the same samples', () => {
+	for (const N of [2, 8, 1024]) {
+		const x = new Float64Array(N).map((_, i) => Math.sin(i * 0.9) - Math.cos(i * 0.4))
+		const [r, m] = fft(x), re = r.slice(), im = m.slice()  // fft's own views are overwritten by ifft
+		const plain = ifft(re, im).slice()
+		const f64 = ifft(re, im, new Float64Array(N)), f32 = ifft(re, im, new Float32Array(N))
+		const again = ifft(re, im, ifft(re, im))  // output aliasing the internal buffer
+		for (let i = 0; i < N; i++)
+			if (f64[i] !== plain[i] || again[i] !== plain[i] || f32[i] !== Math.fround(plain[i])) throw new Error(`N=${N}, i=${i}`)
+	}
+})
+
 t('ifft: DC spectrum → constant signal', () => {
 	const N = 64, half = N / 2
 	const re = new Float64Array(half + 1)

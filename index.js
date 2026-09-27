@@ -341,7 +341,7 @@ export function fft(input, output) {
 
 // Inverse split-radix DIF core — mirror of forward DIT transform()
 function inverseTransform(N, entry) {
-	const { x, tw, stages, perm } = entry
+	const { x, tw, stages } = entry
 	const numStages = stages.length
 
 	// DIF: butterflies from large n2 to small (reverse of forward)
@@ -442,16 +442,7 @@ function inverseTransform(N, entry) {
 		}
 		ix = 2 * (id - 1)
 	}
-
-	// Bit-reversal permutation (in-place swap)
-	for (let i = 0; i < N; i++) {
-		const j = perm[i]
-		if (i < j) { const t = x[i]; x[i] = x[j]; x[j] = t }
-	}
-
-	// Scale by 1/N
-	const inv = 1 / N
-	for (let i = 0; i < N; i++) x[i] *= inv
+	// bit-reversal reorder and 1/N scaling: in ifft, fused with the copy out when there is one
 }
 
 /**
@@ -481,9 +472,17 @@ export function ifft(re, im, output) {
 
 	inverseTransform(N, entry)
 
-	if (output) {
-		for (let i = 0; i < N; i++) output[i] = x[i]
+	// Bit-reversal reorder + 1/N scale: one gather pass into a separate output, else in place
+	const { perm } = entry, inv = 1 / N
+	if (output && output.buffer !== x.buffer) {
+		for (let i = 0; i < N; i++) output[i] = x[perm[i]] * inv
 		return output
 	}
+	for (let i = 0; i < N; i++) {
+		const j = perm[i]
+		if (i < j) { const t = x[i]; x[i] = x[j]; x[j] = t }
+	}
+	for (let i = 0; i < N; i++) x[i] *= inv
+	if (output) { for (let i = 0; i < N; i++) output[i] = x[i]; return output }
 	return x
 }

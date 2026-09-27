@@ -72,6 +72,20 @@ function toPolar(re, im, sc, half) {
 	return { mag, phase }
 }
 
+/** A frame's processed spectrum. With `complex`, process(re, im, state, ctx) → { re, im } works on the
+ *  complex bins (it converts only what it needs — no polar round trip); otherwise process(mag, phase,
+ *  state, ctx) → { mag, phase }, converted back into sc.re/sc.im. */
+function spectrum(process, complex, re, im, state, ctx, sc, half) {
+	if (complex) { const r = process(re, im, state, ctx); return [r.re, r.im] }
+	const { mag, phase } = toPolar(re, im, sc, half)
+	const r = process(mag, phase, state, ctx)
+	for (let k = 0; k <= half; k++) {
+		sc.re[k] = r.mag[k] * Math.cos(r.phase[k])
+		sc.im[k] = r.mag[k] * Math.sin(r.phase[k])
+	}
+	return [sc.re, sc.im]
+}
+
 /** IFFT re/im, window, and OLA into out/norm at position pos */
 function synthesizeFrame(re, im, pos, win, out, norm, sc) {
 	const N = win.length
@@ -222,6 +236,7 @@ export function istft(frames, opts) {
  * @param {number} [opts.anaHop=hopSize] - Analysis hop (distance between input frames).
  * @param {number} [opts.synHop=hopSize] - Synthesis hop (distance between output frames). `synHop !== anaHop` time-stretches by `synHop/anaHop`.
  * @param {number} [opts.sampleRate=44100] - Sample rate (passed to ctx).
+ * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (may edit them in place).
  * @returns {Float32Array} Processed signal. Length is `round(data.length * synHop / anaHop)`.
  */
 export function stftBatch(data, process, opts) {
@@ -230,6 +245,7 @@ export function stftBatch(data, process, opts) {
 	const anaHopV = opts?.anaHop ?? hop
 	const synHopV = opts?.synHop ?? hop
 	const half = N >> 1
+	const complex = !!opts?.complex
 
 	// Hops may be functions `(frameStart, ctx) => hop` sampled once per frame —
 	// time-varying stretch (sliding tempo). Constant hops keep the exact legacy path.
@@ -291,19 +307,13 @@ export function stftBatch(data, process, opts) {
 			f[i] = (sIdx >= 0 && sIdx < inLen ? data[sIdx] : 0) * win[i]
 		}
 		const [re, im] = fft(f, [sc.re, sc.im])
-		const { mag, phase } = toPolar(re, im, sc, half)
 
 		ctx.frameStart = Math.round(aPos) - pad
 		if (anaHopFn) ctx.anaHop = Math.max(1e-6, anaHopFn(ctx.frameStart, ctx))
 		if (synHopFn) ctx.synHop = Math.max(1e-6, synHopFn(ctx.frameStart, ctx))
-		const r = process(mag, phase, state, ctx)
+		const [yr, yi] = spectrum(process, complex, re, im, state, ctx, sc, half)
 
-		for (let k = 0; k <= half; k++) {
-			sc.re[k] = r.mag[k] * Math.cos(r.phase[k])
-			sc.im[k] = r.mag[k] * Math.sin(r.phase[k])
-		}
-
-		synthesizeFrame(sc.re, sc.im, sPos, win, out, norm, sc)
+		synthesizeFrame(yr, yi, sPos, win, out, norm, sc)
 
 		aPos += varHop ? ctx.anaHop : anaHop
 		sPos += varHop ? ctx.synHop : synHop
@@ -338,6 +348,7 @@ export function stftBatch(data, process, opts) {
  * @param {number} [opts.anaHop=hopSize] - Analysis hop.
  * @param {number} [opts.synHop=hopSize] - Synthesis hop. `synHop !== anaHop` time-stretches by `synHop/anaHop`.
  * @param {number} [opts.sampleRate=44100] - Sample rate (passed to ctx).
+ * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (may edit them in place).
  * @returns {{write(chunk):Float32Array,flush():Float32Array}}
  */
 export function stftStream(process, opts) {
@@ -346,6 +357,7 @@ export function stftStream(process, opts) {
 	const anaHopV = opts?.anaHop ?? hop
 	const synHopV = opts?.synHop ?? hop
 	const half = N >> 1
+	const complex = !!opts?.complex
 
 	// Hops may be functions `(frameStart, ctx) => hop` sampled once per frame —
 	// time-varying stretch. Constant hops keep the exact legacy path.
@@ -410,15 +422,9 @@ export function stftStream(process, opts) {
 		ctx.frameStart = time - half
 		if (anaHopFn) ctx.anaHop = Math.max(1e-6, anaHopFn(ctx.frameStart, ctx))
 		if (synHopFn) ctx.synHop = Math.max(1e-6, synHopFn(ctx.frameStart, ctx))
-		const { mag, phase } = toPolar(re, im, sc, half)
-		const r = process(mag, phase, state, ctx)
+		const [yr, yi] = spectrum(process, complex, re, im, state, ctx, sc, half)
 
-		for (let k = 0; k <= half; k++) {
-			sc.re[k] = r.mag[k] * Math.cos(r.phase[k])
-			sc.im[k] = r.mag[k] * Math.sin(r.phase[k])
-		}
-
-		const sf = ifft(sc.re, sc.im, sc.f)
+		const sf = ifft(yr, yi, sc.f)
 		const pos = nextSynPos - outStart
 		nextSynPos += varHop ? ctx.synHop : synHop
 		ensureOut(pos + N)
