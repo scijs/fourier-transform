@@ -118,7 +118,7 @@ Processes each frame through a callback and overlap-adds the result.
     - `ctx.opts` — cloned copy of `opts`. Use this to pass custom parameters (e.g. `ratio`, `ratioFn`) through to your process callback.
 - `opts.anaHop` — analysis hop (default: `hopSize`).
 - `opts.synHop` — synthesis hop (default: `hopSize`). When `anaHop !== synHop`, the output is time-stretched or compressed.
-- `opts.complex` — `process(re, im, state, ctx)` → `{ re, im }` gets the complex bins (`Float64Array(half + 1)`, editable in place) instead of polar form: a process that rotates or scales bins skips the `atan2` / `sin` / `cos` round trip.
+- `opts.complex` – `process(re, im, state, ctx)` → `{ re, im }` gets the complex bins (`Float64Array(half + 1)`, editable in place) instead of polar form: a process that rotates or scales bins skips the `atan2` / `sin` / `cos` round trip.
 - Returns `Float32Array` of length `round(data.length * synHop / anaHop)` (same as input when `anaHop === synHop`).
 
 ```js

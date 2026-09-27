@@ -73,7 +73,7 @@ function toPolar(re, im, sc, half) {
 }
 
 /** A frame's processed spectrum. With `complex`, process(re, im, state, ctx) → { re, im } works on the
- *  complex bins (it converts only what it needs — no polar round trip); otherwise process(mag, phase,
+ *  complex bins (it converts only what it needs, no polar round trip); otherwise process(mag, phase,
  *  state, ctx) → { mag, phase }, converted back into sc.re/sc.im. */
 function spectrum(process, complex, re, im, state, ctx, sc, half) {
 	if (complex) { const r = process(re, im, state, ctx); return [r.re, r.im] }

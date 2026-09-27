@@ -124,7 +124,7 @@ t('ifft(fft(x)) round-trip recovers signal', () => {
 	}
 })
 
-t('ifft: into a separate buffer, into its own returned buffer, or none — the same samples', () => {
+t('ifft: the same samples into a separate buffer, into its own returned buffer, or none', () => {
 	for (const N of [2, 8, 1024]) {
 		const x = new Float64Array(N).map((_, i) => Math.sin(i * 0.9) - Math.cos(i * 0.4))
 		const [r, m] = fft(x), re = r.slice(), im = m.slice()  // fft's own views are overwritten by ifft
