@@ -436,8 +436,8 @@ export function stftStream(process, opts) {
 
 	// Emit output up to synthesis position `synUpto`, clamped to what is final.
 	// Constant hops: the closed-form input→synthesis ratio. Function hops: every
-	// future frame writes at ≥ nextSynPos, so [0, nextSynPos) is final — a running
-	// accumulator replaces the formula.
+	// future frame writes at ≥ nextSynPos, so [0, nextSynPos) is final: a running
+	// accumulator replaces the formula, and the clamp alone is the emission point.
 	function emit(synUpto) {
 		synUpto = Math.min(synUpto, varHop ? Math.floor(nextSynPos) : Math.round(totalIn * synHop / anaHop))
 		if (synUpto <= emitted) return new Float32Array(0)
@@ -458,15 +458,15 @@ export function stftStream(process, opts) {
 			if (engine._flushed()) throw new Error('stftStream already flushed')
 			totalIn += chunk.length
 			engine.write(chunk)
-			// Safe emission: the deepest-processed frame starts at ≈(totalIn − N) in
-			// analysis coords, which synthesizes at totalIn·factor − pOut — everything
-			// before that is final. Back off pOut in synthesis coords.
-			return emit(varHop ? Math.floor(nextSynPos) - pOut : Math.round(totalIn * synHop / anaHop) - pOut)
+			// Constant hops: the deepest-processed frame starts at ≈(totalIn − N) in
+			// analysis coords, which synthesizes at totalIn·factor − pOut; everything
+			// before that is final. Function hops: nextSynPos already sits there.
+			return emit(varHop ? Infinity : Math.round(totalIn * synHop / anaHop) - pOut)
 		},
 		flush() {
 			if (engine._flushed()) return new Float32Array(0)
 			engine.flush()
-			return emit(varHop ? Math.floor(nextSynPos) : Math.round(totalIn * synHop / anaHop))
+			return emit(Infinity)
 		},
 	}
 }

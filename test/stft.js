@@ -682,3 +682,34 @@ t('stftStream: analysis hop longer than the frame (strong compression) streams �
 		if (m > 1e-6) throw new Error(`chunks ${size}: max deviation ${m}`)
 	}
 })
+
+t('stftStream: function hops emit a sample as soon as it is final (one pOut hold-back, not two)', () => {
+	// A sample is final once the next frame's synthesis start passes it: after each write the
+	// stream must have emitted floor(−pOut + Σ synHop of the frames processed). Function hops
+	// held back pOut more, twice the latency of the same hops given as constants.
+	const N = 2048, n = 12000, d = new Float32Array(n).fill(0.1)
+	const slide = fs => 256 + 256 * Math.min(1, Math.max(0, fs / n))
+	for (const [anaHop, synHop, r0] of [[() => 512, () => 512, 1], [() => 256, () => 512, 2], [() => 512, () => 256, 0.5], [256, slide, 1], [fs => 512 / (1 + Math.max(0, fs) / n), 512, 1]]) {
+		const pOut = Math.round(N / 2 * (r0 + 1))
+		let syn = 0, E = 0
+		const s = stftStream((mag, phase, st, ctx) => (syn += ctx.synHop, { mag, phase }), { frameSize: N, anaHop, synHop })
+		for (let m = 0; m < n; m += 100) {
+			E += s.write(d.subarray(m, m + 100)).length
+			const min = Math.max(0, Math.floor(syn - pOut))
+			if (E !== min) throw new Error(`r0 ${r0}, after ${m + 100}: emitted ${E}, final ${min}`)
+		}
+	}
+})
+
+t('stftStream: constant hops keep their emission schedule, round(M·r) − pOut after M samples', () => {
+	const N = 2048, n = 12000, d = new Float32Array(n).fill(0.1)
+	for (const [anaHop, synHop] of [[512, 512], [256, 512], [512, 256], [512 / 1.5, 512]]) {
+		const r = synHop / anaHop, pOut = Math.round(N / 2 * (r + 1)), s = stftStream((mag, phase) => ({ mag, phase }), { frameSize: N, anaHop, synHop })
+		let E = 0
+		for (let m = 0; m < n; m += 100) {
+			E += s.write(d.subarray(m, m + 100)).length
+			const want = Math.max(0, Math.round((m + 100) * r) - pOut)
+			if (E !== want) throw new Error(`r ${r}, after ${m + 100}: emitted ${E}, want ${want}`)
+		}
+	}
+})
