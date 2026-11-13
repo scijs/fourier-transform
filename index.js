@@ -486,3 +486,9 @@ export function ifft(re, im, output) {
 	if (output) { for (let i = 0; i < N; i++) output[i] = x[i]; return output }
 	return x
 }
+
+/** The tables a size's real FFT runs on (bit-reversal permutation, split-radix twiddles), for fourier-transform/pair */
+export function tables(N) {
+	const { perm, tw } = getEntry(N)
+	return { perm, tw }
+}

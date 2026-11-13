@@ -1,15 +1,16 @@
 {
   "name": "fourier-transform",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "description": "Minimalistic and efficient FFT implementation",
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./index.js",
-    "./stft": "./stft.js"
+    "./stft": "./stft.js",
+    "./pair": "./pair.js"
   },
   "scripts": {
-    "test": "node --test test/rfft.js test/fft.js test/stft.js",
+    "test": "node --test test/rfft.js test/fft.js test/stft.js test/pair.js",
     "benchmark": "node benchmark/run.js"
   },
   "repository": {
@@ -18,7 +19,8 @@
   },
   "files": [
     "index.js",
-    "stft.js"
+    "stft.js",
+    "pair.js"
   ],
   "keywords": [
     "fourier",

@@ -69,6 +69,21 @@ In-place complex forward FFT (unnormalized). Both `re` and `im` must be `Float64
 
 In-place complex inverse FFT (1/N normalized). Same signature as `cfft`.
 
+### `pair(N)` – `fourier-transform/pair`
+
+Two real FFTs at once, one channel in each lane of WebAssembly SIMD (`pair.wat`, 3 KB, compiled synchronously): each lane runs the split-radix above with the same float ops in the same order, so its bins are the bits `fft()` gives and its samples the bits `ifft()` gives, in a quarter to a third of the time of the two calls (N = 2048, Node 25, Apple M4 Max). `null` where WebAssembly SIMD does not run, or for N not a power of 2 from 4.
+
+```js
+import pair from 'fourier-transform/pair'
+
+const p = pair(2048)
+for (let i = 0; i < 2048; i++) { p.input[2 * i] = left[i]; p.input[2 * i + 1] = right[i] }
+p.fft()                // p.re[0], p.im[0]: left's bins; p.re[1], p.im[1]: right's
+p.ifft()               // p.output[0], p.output[1]: the samples of the bins
+```
+
+One pair per size, on one memory: a call overwrites what the last one left. `own(N)` gives a pair of one's own, with room in its memory past `base` (`room(bytes)`) for what its holder keeps beside the transforms, and two passes over it: `win(a, b, w)`, the input from two frames each times a window, and `ola(oa, ob, on, w, w2)`, the output times the window added into two sums and the window's square into a normalizer, the products and sums of the JS loops. `stftStream` keeps its output sums there.
+
 ## STFT
 
 ```js
@@ -134,6 +149,7 @@ const result = stftBatch(signal, (mag, phase, state, ctx) => {
 Streaming version of `stftBatch`. Returns `{ write(chunk), flush() }`.
 
 - Supports `opts.anaHop` / `opts.synHop` for time-stretching in streaming context, and `opts.complex`.
+- `opts.channels`: one stream for that many channels, `write(chunks)` and `flush()` taking and returning an array of them. The frames of every channel sit at the same places, the hops are asked once a frame, `process` gets a state per channel and `ctx.channel`; each channel's samples are the ones its own stream gives, and two channels' transforms run at once (`pair`).
 
 ```js
 const stream = stftStream((mag, phase) => ({ mag, phase }), { frameSize: 2048 })
