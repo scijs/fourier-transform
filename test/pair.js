@@ -77,3 +77,38 @@ t('stftStream channels: each channel the samples its own stream gives, three cha
 	for (let c = 0; c < 3; c++) if (!same(one[c], all[c])) throw new Error(`channel ${c} differs from its own stream`)
 	if (!(one[0].length > n / 2)) throw new Error('expected the stream to give its output')
 })
+
+t('stftStream joint: one call a frame with every channel\'s bins, one state; a channel-by-channel process gives the bits it gives apart', () => {
+	const n = 20000
+	const hop = () => { let k = 0; return (fs, ctx) => ctx ? 300 : 280 + ((k++ * 7) % 41) }
+	const opts = () => ({ frameSize: 1024, synHop: 256, anaHop: hop(), complex: true })
+	// the same turn of every bin, a channel at a time and all channels at once
+	const turn = (re, im) => { for (let k = 0; k < re.length; k++) { const r = re[k]; re[k] = 0.9 * r - 0.1 * im[k]; im[k] = 0.1 * r + 0.9 * im[k] } }
+	const feed = (s, x, nch) => { const all = Array.from({ length: nch }, () => []); for (let i = 0; i < n; i += 3000) s.write(x.map(ch => ch.subarray(i, i + 3000))).forEach((o, c) => all[c].push(...o)); s.flush().forEach((o, c) => all[c].push(...o)); return all }
+	for (const nch of [1, 2, 3, 4]) {
+		const x = Array.from({ length: nch }, (_, c) => Float32Array.from({ length: n }, (_, i) => Math.sin(i * (0.03 + 0.02 * c)) + 0.1 * rand()))
+		const apart = feed(stftStream((re, im) => (turn(re, im), { re, im }), { ...opts(), channels: nch }), x, nch)
+		let calls = 0, widths = new Set(), states = new Set(), bins = new Set()
+		const joint = feed(stftStream((res, ims, state, ctx) => {
+			calls++; widths.add(res.length + ':' + ims.length); states.add(state); res.forEach(re => bins.add(re.length))
+			for (let c = 0; c < res.length; c++) turn(res[c], ims[c])
+		}, { ...opts(), channels: nch, joint: true }), x, nch)
+		for (let c = 0; c < nch; c++) if (!same(apart[c], joint[c])) throw new Error(`${nch} channels: channel ${c} differs from the stream a channel at a time`)
+		if (widths.size !== 1 || !widths.has(nch + ':' + nch)) throw new Error(`${nch} channels: process got ${[...widths]}`)
+		if (states.size !== 1 || bins.size !== 1 || !bins.has(513)) throw new Error(`${nch} channels: ${states.size} states, bins of ${[...bins]}`)
+		if (!(calls > 50)) throw new Error(`${nch} channels: ${calls} frames`)
+	}
+})
+
+t('stftStream joint: the bins of one channel reach another\'s output; complex bins only', () => {
+	// process swaps two channels' bins: each comes out as the other's own stream gives
+	const n = 12000, x = [0, 1].map(c => Float32Array.from({ length: n }, (_, i) => Math.sin(i * (0.05 + 0.04 * c))))
+	const run = (s, chunks) => { const a = s.write(chunks), b = s.flush(); return a.map((o, c) => [...o, ...b[c]]) }
+	const plain = run(stftStream((re, im) => ({ re, im }), { frameSize: 512, complex: true, channels: 2 }), x)
+	const swap = run(stftStream((res, ims) => { for (let k = 0; k < res[0].length; k++) { let r = res[0][k], i = ims[0][k]; res[0][k] = res[1][k]; ims[0][k] = ims[1][k]; res[1][k] = r; ims[1][k] = i } }, { frameSize: 512, complex: true, channels: 2, joint: true }), x)
+	if (!same(swap[0], plain[1]) || !same(swap[1], plain[0])) throw new Error('swapped bins did not swap the channels')
+	let threw = false
+	try { stftStream(() => {}, { channels: 2, joint: true }) } catch { threw = true }
+	if (!threw) throw new Error('joint without complex must throw')
+})
+

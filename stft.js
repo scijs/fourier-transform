@@ -355,6 +355,7 @@ export function stftBatch(data, process, opts) {
  * @param {number} [opts.sampleRate=44100] - Sample rate (passed to ctx).
  * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (may edit them in place).
  * @param {number} [opts.channels] - Channels in one stream: write and flush take and return arrays.
+ * @param {boolean} [opts.joint] - With `channels` and `complex`: `process(res, ims, state, ctx)` once a frame with every channel's bins (an array a channel, edited in place) and one state.
  * @returns {{write(chunk):Float32Array,flush():Float32Array}}
  */
 export function stftStream(process, opts) {
@@ -421,7 +422,12 @@ function streams(process, opts, nch) {
 	let outStart = -pOut
 	let emitted = 0
 	let totalIn = 0
-	const states = Array.from({ length: nch }, () => ({}))
+	// joint: one call a frame with every channel's bins, one state; their bins each channel's own arrays (a pair's two
+	// stay in its kernel)
+	const joint = !!opts?.joint
+	if (joint && !complex) throw new Error('joint frames are complex bins: pass complex')
+	const states = Array.from({ length: joint ? 1 : nch }, () => ({}))
+	const spec = joint && !(pr && nch <= 2) ? Array.from({ length: nch }, () => [new Float64Array(half + 1), new Float64Array(half + 1)]) : null
 	let nextSynPos = -pOut
 	const ctx = {
 		N, half, hop,
@@ -465,6 +471,27 @@ function streams(process, opts, nch) {
 		if (yi !== im) im.set(yi.subarray(0, half + 1))
 	}
 
+	// A pair's frames, channels c and c + 1 (`two`), windowed and transformed in the kernel
+	function pairIn(c, two, pos) {
+		frames[0].set(inBuf[c].subarray(pos, pos + N))
+		if (two) frames[1].set(inBuf[c + 1].subarray(pos, pos + N))
+		pr.win(F, two ? F + 8 * N : F, W)
+		pr.fft()
+	}
+
+	// The kernel's bins back to samples, added into the pair's sums at `at`: at a whole sample in the kernel, the
+	// normalizer with the first pair; a fractional one (a synthesis hop not whole) as the JS loop takes it
+	function pairOut(c, two, at) {
+		const len = normBuf.length
+		pr.ifft()
+		if (Number.isInteger(at)) return pr.ola(O + 8 * (len * (c + 1) + at), two ? O + 8 * (len * (c + 2) + at) : -1, c ? -1 : O + 8 * at, W, W + 8 * N)
+		for (let l = 0; l < (two ? 2 : 1); l++) {
+			const o = outBuf[c + l], s = pr.output[l]
+			for (let i = 0; i < N; i++) o[at + i] += s[i] * win[i]
+		}
+		if (!c) for (let i = 0; i < N; i++) normBuf[at + i] += win2[i]
+	}
+
 	// One frame of every channel, starting at pos in the input, its centre at time
 	function frame(pos, time) {
 		ctx.frameStart = time - half
@@ -473,24 +500,14 @@ function streams(process, opts, nch) {
 		const at = nextSynPos - outStart
 		nextSynPos += varHop ? ctx.synHop : synHop
 		ensureOut(at + N)
+		if (joint) return jointFrame(pos, at)
 		for (let c = 0; c < nch; c += 2) {
 			if (pr) {
-				const two = c + 1 < nch, len = normBuf.length
-				frames[0].set(inBuf[c].subarray(pos, pos + N))
-				if (two) frames[1].set(inBuf[c + 1].subarray(pos, pos + N))
-				pr.win(F, two ? F + 8 * N : F, W)
-				pr.fft()
+				const two = c + 1 < nch
+				pairIn(c, two, pos)
 				bins(c, pr.re[0], pr.im[0])
 				if (two) bins(c + 1, pr.re[1], pr.im[1])
-				pr.ifft()
-				// the sums at a whole sample in the kernel, the normalizer with the first pair; a fractional one (a synthesis
-				// hop not whole) as the JS loop takes it
-				if (Number.isInteger(at)) { pr.ola(O + 8 * (len * (c + 1) + at), two ? O + 8 * (len * (c + 2) + at) : -1, c ? -1 : O + 8 * at, W, W + 8 * N); continue }
-				for (let l = 0; l < (two ? 2 : 1); l++) {
-					const o = outBuf[c + l], s = pr.output[l]
-					for (let i = 0; i < N; i++) o[at + i] += s[i] * win[i]
-				}
-				if (!c) for (let i = 0; i < N; i++) normBuf[at + i] += win2[i]
+				pairOut(c, two, at)
 				continue
 			}
 			for (let l = c; l < Math.min(nch, c + 2); l++) {
@@ -500,6 +517,39 @@ function streams(process, opts, nch) {
 				ctx.channel = l
 				const [yr, yi] = spectrum(process, complex, re, im, states[l], ctx, sc, half)
 				const sf = ifft(yr, yi, sc.f), o = outBuf[l]
+				for (let i = 0; i < N; i++) o[at + i] += sf[i] * win[i]
+			}
+		}
+		if (!pr) for (let i = 0; i < N; i++) normBuf[at + i] += win2[i]
+	}
+
+	// The frame of every channel in one call: process(res, ims, state, ctx) edits their bins in place
+	function jointFrame(pos, at) {
+		if (!spec) {
+			const two = nch === 2
+			pairIn(0, two, pos)
+			process(two ? pr.re : [pr.re[0]], two ? pr.im : [pr.im[0]], states[0], ctx)
+			return pairOut(0, two, at)
+		}
+		for (let c = 0; c < nch; c += 2) {
+			const two = c + 1 < nch
+			if (pr) {
+				pairIn(c, two, pos)
+				for (let l = 0; l < (two ? 2 : 1); l++) { spec[c + l][0].set(pr.re[l]); spec[c + l][1].set(pr.im[l]) }
+			} else for (let l = c; l < (two ? c + 2 : c + 1); l++) {
+				const f = sc.f, src = inBuf[l]
+				for (let i = 0; i < N; i++) f[i] = src[pos + i] * win[i]
+				fft(f, spec[l])
+			}
+		}
+		process(spec.map(s => s[0]), spec.map(s => s[1]), states[0], ctx)
+		for (let c = 0; c < nch; c += 2) {
+			const two = c + 1 < nch
+			if (pr) {
+				for (let l = 0; l < (two ? 2 : 1); l++) { pr.re[l].set(spec[c + l][0]); pr.im[l].set(spec[c + l][1]) }
+				pairOut(c, two, at)
+			} else for (let l = c; l < (two ? c + 2 : c + 1); l++) {
+				const sf = ifft(spec[l][0], spec[l][1], sc.f), o = outBuf[l]
 				for (let i = 0; i < N; i++) o[at + i] += sf[i] * win[i]
 			}
 		}

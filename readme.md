@@ -150,6 +150,7 @@ Streaming version of `stftBatch`. Returns `{ write(chunk), flush() }`.
 
 - Supports `opts.anaHop` / `opts.synHop` for time-stretching in streaming context, and `opts.complex`.
 - `opts.channels`: one stream for that many channels, `write(chunks)` and `flush()` taking and returning an array of them. The frames of every channel sit at the same places, the hops are asked once a frame, `process` gets a state per channel and `ctx.channel`; each channel's samples are the ones its own stream gives, and two channels' transforms run at once (`pair`).
+- `opts.joint` (with `channels` and `complex`): `process(res, ims, state, ctx)` once a frame with every channel's bins, an array a channel, edited in place, and one state: for a step that turns the channels together (a vocoder that keeps the phase between them).
 
 ```js
 const stream = stftStream((mag, phase) => ({ mag, phase }), { frameSize: 2048 })
