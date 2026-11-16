@@ -63,6 +63,16 @@ function analyzeFrame(src, srcPos, win, sc) {
 	return fft(f, [sc.re, sc.im])
 }
 
+/** f = the N samples of src from `start` times the window, zeros where they fall outside it (the padding):
+ *  the bounds found once a frame, not tested every sample */
+function windowIn(f, src, start, win) {
+	const N = win.length, a = Math.min(N, Math.max(0, -start)), b = Math.max(a, Math.min(N, src.length - start))
+	f.fill(0, 0, a)
+	for (let i = a; i < b; i++) f[i] = src[start + i] * win[i]
+	f.fill(0, b, N)
+	return f
+}
+
 /** Convert complex [re, im] to polar into sc.mag/sc.phase */
 function toPolar(re, im, sc, half) {
 	const mag = sc.mag, phase = sc.phase
@@ -142,12 +152,7 @@ export function stft(signal, opts) {
 	const paddedLen = signal.length + pad * 2
 
 	for (let pos = 0; pos + N <= paddedLen; pos += hop) {
-		const f = sc.f
-		for (let i = 0; i < N; i++) {
-			const sIdx = pos + i - pad
-			f[i] = (sIdx >= 0 && sIdx < signal.length ? signal[sIdx] : 0) * win[i]
-		}
-		const [re, im] = fft(f, [sc.re, sc.im])
+		const [re, im] = fft(windowIn(sc.f, signal, pos - pad, win), [sc.re, sc.im])
 		frames.push(makeFrame(re, im, pos - pad + half, half))
 	}
 
@@ -302,12 +307,7 @@ export function stftBatch(data, process, opts) {
 	let aPos = 0, sPos = 0
 	while (aPos + N <= paddedInLen && (varHop || sPos + N <= paddedOutLen)) {
 		if (varHop) grow(sPos + N)
-		const f = sc.f
-		for (let i = 0; i < N; i++) {
-			const sIdx = Math.round(aPos) + i - pad
-			f[i] = (sIdx >= 0 && sIdx < inLen ? data[sIdx] : 0) * win[i]
-		}
-		const [re, im] = fft(f, [sc.re, sc.im])
+		const [re, im] = fft(windowIn(sc.f, data, Math.round(aPos) - pad, win), [sc.re, sc.im])
 
 		ctx.frameStart = Math.round(aPos) - pad
 		if (anaHopFn) ctx.anaHop = Math.max(1e-6, anaHopFn(ctx.frameStart, ctx))

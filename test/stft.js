@@ -341,6 +341,30 @@ t('stft accepts Float64Array and plain Array', () => {
 	if (frames64.length !== framesArr.length) throw new Error('Frame count mismatch between Float64Array and Array')
 })
 
+t('stft, stftBatch: every frame the signal times the window, zeros past its ends, to the bit', async () => {
+	const { fft } = await import('../index.js')
+	// the definition: each sample tested against the signal's bounds
+	const hann = (i, N) => 0.5 * (1 - Math.cos(PI2 * i / N))
+	const frameAt = (x, start, N) => Float64Array.from({ length: N }, (_, i) => (start + i >= 0 && start + i < x.length ? x[start + i] : 0) * hann(i, N))
+	const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+	let frames = 0
+	for (const N of [8, 64, 256]) for (const len of [1, N / 4 + 1, N, 3 * N + 5]) for (const x of [Float32Array.from({ length: len }, (_, i) => Math.sin(i) + 0.1), Array.from({ length: len }, (_, i) => Math.cos(i * 0.3))]) {
+		const hop = Math.max(1, (N >> 2) + 1)
+		stft(x, { frameSize: N, hopSize: hop }).forEach((f, k) => {
+			const [re, im] = fft(frameAt(x, k * hop - N, N))
+			if (!same(f.re, re) || !same(f.im, im)) throw new Error(`stft N ${N} len ${len} frame ${k} differs from the definition`)
+			frames++
+		})
+		stftBatch(x, (re, im, state, ctx) => {
+			const [r, i] = fft(frameAt(x, ctx.frameStart, N))
+			if (!same(re, r) || !same(im, i)) throw new Error(`stftBatch N ${N} len ${len} at ${ctx.frameStart} differs from the definition`)
+			frames++
+			return { re, im }
+		}, { frameSize: N, hopSize: hop, complex: true })
+	}
+	if (frames < 200) throw new Error(`only ${frames} frames checked`)
+})
+
 t('manipulating frames between stft and istft preserves round-trip', () => {
 	const N = 128
 	const signal = new Float32Array(N * 4)
