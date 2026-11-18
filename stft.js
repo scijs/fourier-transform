@@ -44,10 +44,11 @@ export function winSqFloor(win, hop) {
 function isPow2(n) { return n > 0 && (n & (n - 1)) === 0 }
 
 function scratch(N, half) {
+	const re = new Float64Array(half + 1), im = new Float64Array(half + 1)
 	return {
 		f: new Float64Array(N),
-		re: new Float64Array(half + 1),
-		im: new Float64Array(half + 1),
+		re, im,
+		spec: [re, im], // fft's output pair, made once: an array literal a frame is an allocation a frame
 		mag: new Float64Array(half + 1),
 		phase: new Float64Array(half + 1),
 	}
@@ -80,21 +81,29 @@ function toPolar(re, im, sc, half) {
 		mag[k] = Math.sqrt(re[k] * re[k] + im[k] * im[k])
 		phase[k] = Math.atan2(im[k], re[k])
 	}
-	return { mag, phase }
 }
 
-/** A frame's processed spectrum. With `complex`, process(re, im, state, ctx) → { re, im } works on the
- *  complex bins (it converts only what it needs, no polar round trip); otherwise process(mag, phase,
- *  state, ctx) → { mag, phase }, converted back into sc.re/sc.im. */
+/** A frame's processed spectrum, back in re/im. With `complex`, process(re, im, state, ctx) works on the complex
+ *  bins (it converts only what it needs, no polar round trip); otherwise process(mag, phase, state, ctx) on the
+ *  polar ones (sc.mag/sc.phase), converted back. It edits them in place and returns nothing, or returns
+ *  { re, im } / { mag, phase }, whose arrays are taken from: nothing returned is nothing to allocate a frame. */
 function spectrum(process, complex, re, im, state, ctx, sc, half) {
-	if (complex) { const r = process(re, im, state, ctx); return [r.re, r.im] }
-	const { mag, phase } = toPolar(re, im, sc, half)
-	const r = process(mag, phase, state, ctx)
-	for (let k = 0; k <= half; k++) {
-		sc.re[k] = r.mag[k] * Math.cos(r.phase[k])
-		sc.im[k] = r.mag[k] * Math.sin(r.phase[k])
+	if (complex) {
+		const r = process(re, im, state, ctx)
+		if (r) { take(re, r.re, half); take(im, r.im, half) }
+		return
 	}
-	return [sc.re, sc.im]
+	toPolar(re, im, sc, half)
+	const r = process(sc.mag, sc.phase, state, ctx), mag = r ? r.mag : sc.mag, phase = r ? r.phase : sc.phase
+	for (let k = 0; k <= half; k++) {
+		re[k] = mag[k] * Math.cos(phase[k])
+		im[k] = mag[k] * Math.sin(phase[k])
+	}
+}
+
+/** Bins 0 to half of `from` into `to`, unless they are the same array (a loop: a subarray to set from is an allocation) */
+function take(to, from, half) {
+	if (from !== to) for (let k = 0; k <= half; k++) to[k] = from[k]
 }
 
 /** IFFT re/im, window, and OLA into out/norm at position pos */
@@ -231,18 +240,18 @@ export function istft(frames, opts) {
  * Batch STFT with per-frame processing callback.
  *
  * `process(mag, phase, state, ctx)` receives the spectrum of each frame and
- * returns `{ mag, phase }` for synthesis. The result is overlap-added and
+ * returns `{ mag, phase }` for synthesis, or nothing when it edited them in place. The result is overlap-added and
  * normalized to produce the output signal.
  *
  * @param {Float32Array|Float64Array} data - Input signal.
- * @param {Function} process - Callback `(mag, phase, state, ctx) => { mag, phase }`.
+ * @param {Function} process - Callback `(mag, phase, state, ctx) => { mag, phase }`, or nothing when it edited them in place.
  * @param {Object} [opts] - Options.
  * @param {number} [opts.frameSize=2048] - FFT size (power of 2).
  * @param {number} [opts.hopSize=512] - Hop size (default: frameSize/4).
  * @param {number} [opts.anaHop=hopSize] - Analysis hop (distance between input frames).
  * @param {number} [opts.synHop=hopSize] - Synthesis hop (distance between output frames). `synHop !== anaHop` time-stretches by `synHop/anaHop`.
  * @param {number} [opts.sampleRate=44100] - Sample rate (passed to ctx).
- * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (may edit them in place).
+ * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (it may edit them in place and return nothing).
  * @returns {Float32Array} Processed signal. Length is `round(data.length * synHop / anaHop)`.
  */
 export function stftBatch(data, process, opts) {
@@ -307,14 +316,14 @@ export function stftBatch(data, process, opts) {
 	let aPos = 0, sPos = 0
 	while (aPos + N <= paddedInLen && (varHop || sPos + N <= paddedOutLen)) {
 		if (varHop) grow(sPos + N)
-		const [re, im] = fft(windowIn(sc.f, data, Math.round(aPos) - pad, win), [sc.re, sc.im])
+		fft(windowIn(sc.f, data, Math.round(aPos) - pad, win), sc.spec)
 
 		ctx.frameStart = Math.round(aPos) - pad
 		if (anaHopFn) ctx.anaHop = Math.max(1e-6, anaHopFn(ctx.frameStart, ctx))
 		if (synHopFn) ctx.synHop = Math.max(1e-6, synHopFn(ctx.frameStart, ctx))
-		const [yr, yi] = spectrum(process, complex, re, im, state, ctx, sc, half)
+		spectrum(process, complex, sc.re, sc.im, state, ctx, sc, half)
 
-		synthesizeFrame(yr, yi, sPos, win, out, norm, sc)
+		synthesizeFrame(sc.re, sc.im, sPos, win, out, norm, sc)
 
 		aPos += varHop ? ctx.anaHop : anaHop
 		sPos += varHop ? ctx.synHop : synHop
@@ -345,23 +354,42 @@ export function stftBatch(data, process, opts) {
  * of them, the frames of every channel at the same places, the hops asked once a frame; each channel's samples
  * are the ones its own stream gives (two channels' transforms run at once, fourier-transform/pair, where
  * WebAssembly SIMD runs).
+ * Given `out` (with channels, an array of them), `write(chunk, out, length)` and `flush(out)` write the samples into it
+ * from its start instead, as many as it holds, and return how many; what it cannot hold waits for the next call. The
+ * bits are the ones the arrays would carry. `length`: the samples taken from the chunk's start (all of them when
+ * omitted). The stream's memory is made with it, for chunks up to `opts.maxChunk`, so a real-time loop allocates
+ * nothing; a longer chunk grows it once.
  *
- * @param {Function} process - Callback `(mag, phase, state, ctx) => { mag, phase }`; with channels, a state each and `ctx.channel`.
+ * @param {Function} process - Callback `(mag, phase, state, ctx) => { mag, phase }`, or nothing when it edited them in place; with channels, a state each and `ctx.channel`.
  * @param {Object} [opts] - Options.
  * @param {number} [opts.frameSize=2048] - FFT size (power of 2).
  * @param {number} [opts.hopSize=512] - Hop size (default: frameSize/4).
  * @param {number} [opts.anaHop=hopSize] - Analysis hop.
  * @param {number} [opts.synHop=hopSize] - Synthesis hop. `synHop !== anaHop` time-stretches by `synHop/anaHop`.
  * @param {number} [opts.sampleRate=44100] - Sample rate (passed to ctx).
- * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (may edit them in place).
+ * @param {boolean} [opts.complex] - `process(re, im, state, ctx) => { re, im }` receives the complex bins instead of polar form (it may edit them in place and return nothing).
  * @param {number} [opts.channels] - Channels in one stream: write and flush take and return arrays.
  * @param {boolean} [opts.joint] - With `channels` and `complex`: `process(res, ims, state, ctx)` once a frame with every channel's bins (an array a channel, edited in place) and one state.
- * @returns {{write(chunk):Float32Array,flush():Float32Array}}
+ * @param {number} [opts.maxChunk=frameSize] - The longest chunk `write` is given: the stream's memory is made for it up front, a longer chunk grows it once.
+ * @returns {{write(chunk, out?, length?):Float32Array|number,flush(out?):Float32Array|number}}
  */
 export function stftStream(process, opts) {
 	if (opts?.channels != null) return streams(process, opts, opts.channels)
-	const s = streams(process, opts, 1)
-	return { write: chunk => s.write([chunk])[0], flush: () => s.flush()[0] }
+	// one channel through the channels' stream, in one-slot arrays made here: a new one a call is an allocation a call
+	const s = streams(process, opts, 1), ins = [null], outs = [null]
+	return {
+		write(chunk, out, length) {
+			ins[0] = chunk
+			if (out == null) return s.write(ins, undefined, length)[0]
+			outs[0] = out
+			return s.write(ins, outs, length)
+		},
+		flush(out) {
+			if (out == null) return s.flush()[0]
+			outs[0] = out
+			return s.flush(outs)
+		},
+	}
 }
 
 function streams(process, opts, nch) {
@@ -371,6 +399,7 @@ function streams(process, opts, nch) {
 	const synHopV = opts?.synHop ?? hop
 	const half = N >> 1
 	const complex = !!opts?.complex
+	const maxChunk = opts?.maxChunk ?? N
 
 	// Hops may be functions `(frameStart, ctx) => hop` sampled once per frame —
 	// time-varying stretch. Constant hops keep the exact legacy path.
@@ -384,6 +413,7 @@ function streams(process, opts, nch) {
 	if (anaHop <= 0) throw new Error(`anaHop must be > 0, got ${anaHop}`)
 	if (synHop <= 0) throw new Error(`synHop must be > 0, got ${synHop}`)
 	if (!(nch >= 1)) throw new Error(`channels must be at least 1, got ${nch}`)
+	if (!(maxChunk >= 1)) throw new Error(`maxChunk must be at least 1, got ${maxChunk}`)
 
 	const win = hannWindow(N), win2 = win.map(w => w * w)
 	const sc = scratch(N, half)
@@ -399,36 +429,46 @@ function streams(process, opts, nch) {
 	// two channels at a time through a pair kernel of the stream's own (fourier-transform/pair), where it runs: in its
 	// memory the window and its square (W), the frame pair (F), and the output sums with their normalizer (O on)
 	const pr = own(N), W = pr ? pr.base : 0, F = W + 16 * N, O = F + 16 * N
+	// joint: one call a frame with every channel's bins, one state; their bins each channel's own arrays (a pair's two
+	// stay in its kernel), and the arrays of them process gets, made once (or with the kernel's memory, in sums)
+	const joint = !!opts?.joint
+	if (joint && !complex) throw new Error('joint frames are complex bins: pass complex')
+	const spec = joint && !(pr && nch <= 2) ? Array.from({ length: nch }, () => [new Float64Array(half + 1), new Float64Array(half + 1)]) : null
+	const specRe = spec?.map(s => s[0]), specIm = spec?.map(s => s[1])
 
-	// the input since the frame the next one starts in, channel by channel
-	let inBuf = Array.from({ length: nch }, () => new Float64Array(N * 4))
+	// The memory a write needs, made here for chunks up to maxChunk. The input: what is kept from the frame the next one
+	// starts in is under 3N samples (processFrames moves it down past 2N), then the chunk, or the padding a flush adds.
+	// The output sums: from the last sample emitted, at most 4N back (trimOut moves them down past it; pOut before the
+	// first), the frames to come start within two synthesis hops of it, and a chunk's frames reach its length times
+	// synHop/anaHop past that, plus a frame. Hops that are functions can go past their first ratio, and an analysis hop
+	// under a sample past two: then, as for a longer chunk, it grows once
+	const longest = Math.max(N, maxChunk)
+	let inBuf = Array.from({ length: nch }, () => new Float64Array(3 * N + longest))
 	let bufLen = pad
-	let streamOffset = 0
-	let nextFramePos = 0
+	// The running positions, each in a typed array: the frames' are fractional for a hop not whole, and the counts pass
+	// V8's small integers (2^31) after 12 hours at 48 kHz; a closure variable holding either is a number allocated at
+	// each write. Where the next frame starts in the input buffer and sits in the output; the input dropped before the
+	// buffer and taken in all; the output sums' first sample and the samples emitted
+	const nextFramePos = new Float64Array(1), nextSynPos = Float64Array.of(-pOut)
+	const streamOffset = new Float64Array(1), totalIn = new Float64Array(1)
+	const outStart = Float64Array.of(-pOut), emitted = new Float64Array(1)
 	let flushed = false
 
 	// the output sums and the window's, `len` samples each: in the kernel's memory, the normalizer then each channel's
 	// (the views made anew), else arrays of their own
-	let outBuf, normBuf, frames
+	let outBuf, normBuf, frames, pairRe, pairIm
 	function sums(len) {
 		if (!pr) { outBuf = Array.from({ length: nch }, () => new Float64Array(len)); normBuf = new Float64Array(len); return }
 		const buf = pr.room(O - pr.base + 8 * len * (nch + 1))
 		normBuf = new Float64Array(buf, O, len)
 		outBuf = Array.from({ length: nch }, (_, c) => new Float64Array(buf, O + 8 * len * (c + 1), len))
 		frames = [new Float64Array(buf, F, N), new Float64Array(buf, F + 8 * N, N)]
+		pairRe = nch === 2 ? pr.re : [pr.re[0]]
+		pairIm = nch === 2 ? pr.im : [pr.im[0]]
 	}
-	sums(N * 8)
+	sums(Math.max(N * 8, Math.ceil(Math.max(4 * N, pOut) + N + 2 * synHop + longest * synHop / anaHop) + 2))
 	if (pr) { new Float64Array(pr.input.buffer, W, N).set(win); new Float64Array(pr.input.buffer, W + 8 * N, N).set(win2) }
-	let outStart = -pOut
-	let emitted = 0
-	let totalIn = 0
-	// joint: one call a frame with every channel's bins, one state; their bins each channel's own arrays (a pair's two
-	// stay in its kernel)
-	const joint = !!opts?.joint
-	if (joint && !complex) throw new Error('joint frames are complex bins: pass complex')
 	const states = Array.from({ length: joint ? 1 : nch }, () => ({}))
-	const spec = joint && !(pr && nch <= 2) ? Array.from({ length: nch }, () => [new Float64Array(half + 1), new Float64Array(half + 1)]) : null
-	let nextSynPos = -pOut
 	const ctx = {
 		N, half, hop,
 		anaHop, synHop,
@@ -439,42 +479,45 @@ function streams(process, opts, nch) {
 		channel: 0,
 	}
 
+	// The growing is a function of its own: a closure in a function, even on a branch not taken, makes V8 allocate the
+	// function's context on every call (here every write and every frame)
 	function ensureIn(need) {
-		if (need <= inBuf[0].length) return
+		if (need > inBuf[0].length) growIn(need)
+	}
+	function growIn(need) {
 		const len = Math.max(need, inBuf[0].length * 2)
 		inBuf = inBuf.map(b => { const nb = new Float64Array(len); nb.set(b.subarray(0, bufLen)); return nb })
 	}
 
 	function ensureOut(needLen) {
+		if (needLen > normBuf.length) growOut(needLen)
+	}
+	function growOut(needLen) {
 		const was = normBuf.length
-		if (needLen <= was) return
 		const keep = [normBuf, ...outBuf].map(b => b.slice())
 		sums(Math.max(needLen, was * 2))
 		;[normBuf, ...outBuf].forEach((b, i) => { b.set(keep[i]); b.fill(0, was) })
 	}
 
 	// what is emitted goes; what the frames have added is past it, up to the last one's end, zeros after
-	function trimOut(emittedAbs) {
-		const dropFront = emittedAbs - outStart
+	function trimOut() {
+		const dropFront = emitted[0] - outStart[0]
 		if (dropFront > N * 4) {
-			const end = Math.min(normBuf.length, Math.max(dropFront, Math.ceil(nextSynPos - outStart) + N))
-			for (const b of [...outBuf, normBuf]) { b.copyWithin(0, dropFront, end); b.fill(0, end - dropFront, end) }
-			outStart += dropFront
+			const end = Math.min(normBuf.length, Math.max(dropFront, Math.ceil(nextSynPos[0] - outStart[0]) + N))
+			for (let c = 0; c <= nch; c++) { const b = c < nch ? outBuf[c] : normBuf; b.copyWithin(0, dropFront, end); b.fill(0, end - dropFront, end) }
+			outStart[0] += dropFront
 		}
 	}
 
-	// A channel's processed bins, written into re/im (process may return its own arrays, or polar ones)
+	// A channel's processed bins, written back into re/im
 	function bins(c, re, im) {
 		ctx.channel = c
-		const [yr, yi] = spectrum(process, complex, re, im, states[c], ctx, sc, half)
-		if (yr !== re) re.set(yr.subarray(0, half + 1))
-		if (yi !== im) im.set(yi.subarray(0, half + 1))
+		spectrum(process, complex, re, im, states[c], ctx, sc, half)
 	}
 
 	// A pair's frames, channels c and c + 1 (`two`), windowed and transformed in the kernel
 	function pairIn(c, two, pos) {
-		frames[0].set(inBuf[c].subarray(pos, pos + N))
-		if (two) frames[1].set(inBuf[c + 1].subarray(pos, pos + N))
+		for (let l = 0; l < (two ? 2 : 1); l++) { const f = frames[l], x = inBuf[c + l]; for (let i = 0; i < N; i++) f[i] = x[pos + i] }   // a loop: a subarray a frame is an allocation a frame
 		pr.win(F, two ? F + 8 * N : F, W)
 		pr.fft()
 	}
@@ -492,13 +535,14 @@ function streams(process, opts, nch) {
 		if (!c) for (let i = 0; i < N; i++) normBuf[at + i] += win2[i]
 	}
 
-	// One frame of every channel, starting at pos in the input, its centre at time
-	function frame(pos, time) {
-		ctx.frameStart = time - half
+	// One frame of every channel, starting at pos in the input buffer (a position past 2^31 is read here, not passed:
+	// a number of that size is allocated as an argument)
+	function frame(pos) {
+		ctx.frameStart = streamOffset[0] + pos - pad
 		if (anaHopFn) ctx.anaHop = Math.max(1e-6, anaHopFn(ctx.frameStart, ctx))
 		if (synHopFn) ctx.synHop = Math.max(1e-6, synHopFn(ctx.frameStart, ctx))
-		const at = nextSynPos - outStart
-		nextSynPos += varHop ? ctx.synHop : synHop
+		const at = nextSynPos[0] - outStart[0]
+		nextSynPos[0] += varHop ? ctx.synHop : synHop
 		ensureOut(at + N)
 		if (joint) return jointFrame(pos, at)
 		for (let c = 0; c < nch; c += 2) {
@@ -513,10 +557,9 @@ function streams(process, opts, nch) {
 			for (let l = c; l < Math.min(nch, c + 2); l++) {
 				const f = sc.f, src = inBuf[l]
 				for (let i = 0; i < N; i++) f[i] = src[pos + i] * win[i]
-				const [re, im] = fft(f, [sc.re, sc.im])
-				ctx.channel = l
-				const [yr, yi] = spectrum(process, complex, re, im, states[l], ctx, sc, half)
-				const sf = ifft(yr, yi, sc.f), o = outBuf[l]
+				fft(f, sc.spec)
+				bins(l, sc.re, sc.im)
+				const sf = ifft(sc.re, sc.im, sc.f), o = outBuf[l]
 				for (let i = 0; i < N; i++) o[at + i] += sf[i] * win[i]
 			}
 		}
@@ -528,7 +571,7 @@ function streams(process, opts, nch) {
 		if (!spec) {
 			const two = nch === 2
 			pairIn(0, two, pos)
-			process(two ? pr.re : [pr.re[0]], two ? pr.im : [pr.im[0]], states[0], ctx)
+			process(pairRe, pairIm, states[0], ctx)
 			return pairOut(0, two, at)
 		}
 		for (let c = 0; c < nch; c += 2) {
@@ -542,7 +585,7 @@ function streams(process, opts, nch) {
 				fft(f, spec[l])
 			}
 		}
-		process(spec.map(s => s[0]), spec.map(s => s[1]), states[0], ctx)
+		process(specRe, specIm, states[0], ctx)
 		for (let c = 0; c < nch; c += 2) {
 			const two = c + 1 < nch
 			if (pr) {
@@ -559,64 +602,88 @@ function streams(process, opts, nch) {
 	function processFrames(limitPos) {
 		// hop may be fractional (stftStream passes anaHop = hopSize/factor): keep the
 		// accumulator exact and round only the read position, mirroring stftBatch.
-		while (Math.round(nextFramePos) + N <= limitPos) {
-			const pos = Math.round(nextFramePos)
-			frame(pos, streamOffset + pos - pad + half)
-			nextFramePos += hopFn ? Math.max(1e-6, hopFn(streamOffset + pos - pad)) : engHop
+		while (Math.round(nextFramePos[0]) + N <= limitPos) {
+			const pos = Math.round(nextFramePos[0])
+			frame(pos)
+			nextFramePos[0] += hopFn ? Math.max(1e-6, hopFn(streamOffset[0] + pos - pad)) : engHop
 		}
 
-		if (nextFramePos > N * 2) {
+		if (nextFramePos[0] > N * 2) {
 			// a hop longer than the frame can put the next frame past the buffered input:
 			// drop at most what is buffered, the rest of the gap stays in nextFramePos
-			const keep = Math.min(Math.floor(nextFramePos) - N, bufLen)
-			for (const b of inBuf) b.copyWithin(0, keep, bufLen)
+			const keep = Math.min(Math.floor(nextFramePos[0]) - N, bufLen)
+			for (let c = 0; c < nch; c++) inBuf[c].copyWithin(0, keep, bufLen)
 			bufLen -= keep
-			nextFramePos -= keep
-			streamOffset += keep
+			nextFramePos[0] -= keep
+			streamOffset[0] += keep
 		}
 	}
 
-	// Emit output up to synthesis position `synUpto`, clamped to what is final.
-	// Constant hops: the closed-form input→synthesis ratio. Function hops: every
-	// future frame writes at ≥ nextSynPos, so [0, nextSynPos) is final: a running
-	// accumulator replaces the formula, and the clamp alone is the emission point.
-	function emit(synUpto) {
-		synUpto = Math.min(synUpto, varHop ? Math.floor(nextSynPos) : Math.round(totalIn * synHop / anaHop))
-		if (synUpto <= emitted) return outBuf.map(() => new Float32Array(0))
-		const count = synUpto - emitted
-		const outs = outBuf.map(() => new Float32Array(count))
+	// How many samples are final and not emitted yet, all of them at the `end`.
+	// Constant hops: the closed-form input→synthesis ratio; the deepest-processed frame starts at ≈(totalIn − N) in
+	// analysis coords, which synthesizes at totalIn·factor − pOut, everything before that is final. Function hops:
+	// every future frame writes at ≥ nextSynPos, so [0, nextSynPos) is final: a running accumulator replaces the formula.
+	function ready(end) {
+		const upto = varHop ? Math.floor(nextSynPos[0]) : Math.round(totalIn[0] * synHop / anaHop) - (end ? 0 : pOut)
+		// a count, so a whole number under 2^31 for any chunk memory holds: | 0 says so, and the count leaves as a small
+		// integer, not a number allocated (on Node 25 once the positions pass 2^31)
+		return upto > emitted[0] ? (upto - emitted[0]) | 0 : 0
+	}
+
+	// The next `count` final samples into outs, from their start
+	function drain(outs, count) {
+		if (!count) return 0
 		for (let i = 0; i < count; i++) {
-			const j = emitted + i - outStart
-			const n = normBuf[j] < floor ? floor : normBuf[j]
+			const j = emitted[0] + i - outStart[0]
+			// Math.max, not `a < floor ? floor : a`, the same number here (the normalizer is a sum of squares): with more
+			// than one stream V8 no longer folds the closure's constants, floor comes as a boxed number of no known type,
+			// and the conditional's two arms met boxed, a number allocated a sample
+			const n = Math.max(normBuf[j], floor)
 			for (let c = 0; c < nch; c++) outs[c][i] = n > 1e-10 ? outBuf[c][j] / n : 0
 		}
-		emitted = synUpto
-		trimOut(emitted)
+		emitted[0] += count
+		trimOut()
+		return count
+	}
+
+	// The final samples: into outs, as many as each holds (the count returned), else into new arrays (returned)
+	function emit(end, outs) {
+		let count = ready(end)
+		if (!outs) return fresh(count)
+		for (let c = 0; c < nch; c++) if (outs[c].length < count) count = outs[c].length
+		return drain(outs, count)
+	}
+	function fresh(count) {
+		const outs = outBuf.map(() => new Float32Array(count))
+		drain(outs, count)
 		return outs
 	}
 
 	return {
-		write(chunks) {
+		write(chunks, outs, length) {
 			if (flushed) throw new Error('stftStream already flushed')
-			const len = chunks[0].length
-			totalIn += len
+			const len = length ?? chunks[0].length
+			totalIn[0] += len
 			ensureIn(bufLen + len)
-			for (let c = 0; c < nch; c++) inBuf[c].set(chunks[c], bufLen)
+			for (let c = 0; c < nch; c++) {
+				const b = inBuf[c], x = chunks[c]
+				if (len === x.length) b.set(x, bufLen)
+				else for (let i = 0; i < len; i++) b[bufLen + i] = x[i]
+			}
 			bufLen += len
 			processFrames(bufLen)
-			// Constant hops: the deepest-processed frame starts at ≈(totalIn − N) in
-			// analysis coords, which synthesizes at totalIn·factor − pOut; everything
-			// before that is final. Function hops: nextSynPos already sits there.
-			return emit(varHop ? Infinity : Math.round(totalIn * synHop / anaHop) - pOut)
+			return emit(false, outs)
 		},
-		flush() {
-			if (flushed) return outBuf.map(() => new Float32Array(0))
-			flushed = true
-			ensureIn(bufLen + pad)
-			for (const b of inBuf) b.fill(0, bufLen, bufLen + pad)
-			bufLen += pad
-			processFrames(bufLen)
-			return emit(Infinity)
+		flush(outs) {
+			// once: the padding through the frames; again (an `out` too short the first time), the rest
+			if (!flushed) {
+				flushed = true
+				ensureIn(bufLen + pad)
+				for (let c = 0; c < nch; c++) inBuf[c].fill(0, bufLen, bufLen + pad)
+				bufLen += pad
+				processFrames(bufLen)
+			}
+			return emit(true, outs)
 		},
 	}
 }

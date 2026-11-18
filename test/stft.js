@@ -737,3 +737,135 @@ t('stftStream: constant hops keep their emission schedule, round(M·r) − pOut 
 		}
 	}
 })
+
+// --- Writing into memory the caller holds: write(chunk, out, length), flush(out) ---
+
+// a seeded generator, and the cases: every option the stream has, at N 256 so 40 frames' signal wraps every buffer
+// (the input moved down past 2N, the output sums past 4N) many times; a sliding hop made anew for every stream
+const seeded = s => () => (s = (s * 16807) % 2147483647) / 2147483647
+const sameBits = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+const slide = () => { let k = 0; return (fs, ctx) => ctx ? 60 : 56 + ((k++ * 7) % 13) }
+const turn = (re, im) => { for (let k = 0; k < re.length; k++) { const r = re[k]; re[k] = 0.9 * r - 0.2 * im[k]; im[k] = 0.2 * r + 0.9 * im[k] } return { re, im } }
+const tilt = (mag, phase, st, ctx) => { for (let k = 0; k < mag.length; k++) mag[k] *= 0.6 + 0.4 * Math.cos(k / 7 + ctx.frameStart / 900); return { mag, phase } }
+const mix = (res, ims) => { for (let c = 0; c < res.length; c++) for (let k = 0; k < res[c].length; k++) { res[c][k] = 0.8 * res[c][k] + 0.2 * res[(c + 1) % res.length][k]; ims[c][k] *= 0.9 } }
+const writeCases = () => [
+	[{}, tilt], [{ hopSize: 128 }, tilt], [{ hopSize: 70 }, tilt], [{ complex: true }, turn],
+	[{ anaHop: 32, synHop: 64 }, tilt], [{ anaHop: 64, synHop: 32 }, tilt], [{ anaHop: 64 / 1.5, synHop: 64 }, tilt], [{ anaHop: 640, synHop: 64 }, tilt],
+	[{ anaHop: slide(), synHop: 64, complex: true }, turn],
+	[{ channels: 1 }, tilt], [{ channels: 2, complex: true }, turn], [{ channels: 3 }, tilt], [{ channels: 2, anaHop: 32, synHop: 48 }, tilt],
+	[{ channels: 2, complex: true, joint: true }, mix], [{ channels: 3, complex: true, joint: true }, mix], [{ channels: 2, anaHop: slide(), synHop: 64, complex: true, joint: true }, mix],
+]
+
+t('stftStream write(chunk, out, length), flush(out): the samples write(chunk) and flush() return, call for call, bit for bit; mono, channels, every option', () => {
+	const N = 256, n = 40 * N + 123, rnd = seeded(7)
+	let calls = 0
+	for (let w = 0; w < writeCases().length; w++) {
+		for (const sizes of [[n], Array.from({ length: 200 }, () => 1 + Math.floor(rnd() * 600)), Array.from({ length: 400 }, () => 1 + Math.floor(rnd() * 9))]) {
+			const [opts, process] = writeCases()[w], C = opts.channels ?? 1, multi = opts.channels != null
+			const x = Array.from({ length: C }, (_, c) => Float32Array.from({ length: n }, (_, i) => Math.sin(i * (0.02 + 0.01 * c)) + 0.2 * (rnd() - 0.5)))
+			const chunk = (t, k) => x.map(ch => ch.subarray(t, t + k))
+			// the reference: the arrays the stream returns
+			const ref = [], a = stftStream(process, { frameSize: N, ...opts })
+			let t = 0
+			for (const k of sizes) { if (t >= n) break; const c = chunk(t, Math.min(k, n - t)); ref.push(multi ? a.write(c) : [a.write(c[0])]); t += c[0].length }
+			ref.push(multi ? a.flush() : [a.flush()], multi ? a.flush() : [a.flush()])
+			// the same into outs; every other chunk inside a longer array, with its length
+			const [opts2] = writeCases()[w], b = stftStream(process, { frameSize: N, ...opts2, maxChunk: 600 })
+			const outs = Array.from({ length: C }, () => new Float32Array(2 * n)), inside = Array.from({ length: C }, () => new Float32Array(700).fill(NaN))
+			t = 0
+			ref.forEach((want, i) => {
+				let got
+				if (i >= ref.length - 2) got = multi ? b.flush(outs) : b.flush(outs[0])
+				else {
+					const k = want === ref[i] && Math.min(sizes[i], n - t), c = chunk(t, k)
+					if (i % 2 && k <= 700) { inside.forEach((v, j) => v.set(c[j])); got = multi ? b.write(inside, outs, k) : b.write(inside[0], outs[0], k) }
+					else got = multi ? b.write(c, outs) : b.write(c[0], outs[0])
+					t += k
+				}
+				if (typeof got !== 'number') throw new Error(`case ${w}: write(chunk, out) returned ${typeof got}, not a count`)
+				for (let c = 0; c < C; c++) if (got !== want[c].length || !sameBits(outs[c].subarray(0, got), want[c])) throw new Error(`case ${w} ${JSON.stringify(opts2)}: call ${i} channel ${c}, ${got} samples against ${want[c].length}`)
+				calls++
+			})
+		}
+	}
+	if (calls < 5000) throw new Error(`only ${calls} calls compared`)
+})
+
+t('stftStream write(chunk, out): an out too short gives what it holds, the rest waits; flush(out) until 0 gives the tail', () => {
+	const N = 256, n = 30 * N, rnd = seeded(3)
+	for (const [opts, process] of writeCases()) {
+		const C = opts.channels ?? 1, multi = opts.channels != null
+		const x = Array.from({ length: C }, () => Float32Array.from({ length: n }, () => rnd() - 0.5))
+		const [opts2] = writeCases().find(([o]) => JSON.stringify(o) === JSON.stringify(opts))
+		const a = stftStream(process, { frameSize: N, ...opts }), b = stftStream(process, { frameSize: N, ...opts2 })
+		const want = Array.from({ length: C }, () => []), got = Array.from({ length: C }, () => []), outs = Array.from({ length: C }, () => new Float32Array(37))
+		const keep = k => { if (k > 37) throw new Error(`gave ${k} into 37`); outs.forEach((o, c) => got[c].push(...o.subarray(0, k))) }
+		for (let t = 0; t < n; t += 500) {
+			const c = x.map(ch => ch.subarray(t, t + 500))
+			;(multi ? a.write(c) : [a.write(c[0])]).forEach((o, i) => want[i].push(...o))
+			keep(multi ? b.write(c, outs) : b.write(c[0], outs[0]))
+		}
+		;(multi ? a.flush() : [a.flush()]).forEach((o, i) => want[i].push(...o))
+		for (let k, g = 0; (k = multi ? b.flush(outs) : b.flush(outs[0])); g++) { keep(k); if (g > n) throw new Error('flush(out) does not come to 0') }
+		for (let c = 0; c < C; c++) if (!sameBits(got[c], want[c])) throw new Error(`${JSON.stringify(opts)} channel ${c}: ${got[c].length} samples against ${want[c].length}, or their bits`)
+	}
+})
+
+t('stftStream, stftBatch: a process may edit its bins in place and return nothing, the bits of returning them', () => {
+	const x = Float32Array.from({ length: 9000 }, (_, i) => Math.sin(i * 0.03) + 0.3 * Math.sin(i * 0.71))
+	const scale = a => { for (let k = 0; k < a.length; k++) a[k] *= 0.5 + 0.5 * Math.cos(k / 5) }
+	for (const [ret, none, opts] of [
+		[(mag, phase) => (scale(mag), { mag, phase }), mag => { scale(mag) }, { frameSize: 512 }],
+		[(re, im) => (scale(re), scale(im), { re, im }), (re, im) => { scale(re); scale(im) }, { frameSize: 512, complex: true }],
+	]) {
+		if (!sameBits(stftBatch(x, ret, opts), stftBatch(x, none, opts))) throw new Error(`stftBatch ${JSON.stringify(opts)}: differs`)
+		const s1 = stftStream(ret, opts), s2 = stftStream(none, opts)
+		if (!sameBits([...s1.write(x), ...s1.flush()], [...s2.write(x), ...s2.flush()])) throw new Error(`stftStream ${JSON.stringify(opts)}: differs`)
+	}
+})
+
+// The validator's measure (@audio/compile tools/verify.js, `young`): in a child Node with its flags, a case a child as it runs a
+// processor a child (code shared by streams of other options would tier anew inside the count), the bytes V8's young
+// generation takes in over 2^15 warm calls, read in two forced minor collections, the lesser of two runs
+const ALLOC_CHILD = `
+import v8 from 'node:v8'
+const { stftStream } = await import(${JSON.stringify(new URL('../stft.js', import.meta.url).href)})
+const minor = { type: 'minor' }, young = s => s.reduce((a, x) => x.spaceName === 'new_space' || x.spaceName === 'new_large_object_space' ? a + x.spaceUsedSize : a, 0)
+const count = f => { const p = new v8.GCProfiler(); p.start(); gc(minor); f(); gc(minor); const g = p.stop().statistics; let y = 0; for (let i = 1; i < g.length; i++) y += young(g[i].beforeGC.heapSpaceStatistics) - young(g[i - 1].afterGC.heapSpaceStatistics); return y }
+const N = 1024, half = N >> 1, F = 64, CALLS = 1 << 15, gain = Float64Array.from({ length: half + 1 }, (_, k) => 0.5 + 0.5 * Math.cos(k / 9))
+// callbacks that allocate nothing: in place, returning a result made once (its fields set)
+const rp = { mag: null, phase: null }, rc = { re: null, im: null }
+const polar = (mag, phase) => { for (let k = 0; k <= half; k++) mag[k] *= gain[k]; rp.mag = mag; rp.phase = phase; return rp }
+const complex = (re, im) => { for (let k = 0; k <= half; k++) { re[k] *= gain[k]; im[k] *= gain[k] } rc.re = re; rc.im = im; return rc }
+const joint = (res, ims) => { for (let c = 0; c < res.length; c++) complex(res[c], ims[c]) }
+const x = [0, 1, 2].map(c => Float32Array.from({ length: 64 * F }, (_, i) => Math.sin(i * (0.01 + 0.003 * c)) + 0.1 * Math.sin(i * 1.3)))
+// a chunk of each channel count made beforehand: the loop takes them as they are
+const chunks = [1, 2, 3].map(C => Array.from({ length: 64 }, (_, k) => x.slice(0, C).map(ch => ch.subarray(k * F, k * F + F))))
+const outs = [1, 2, 3].map(C => Array.from({ length: C }, () => new Float32Array(F + 2 * N)))
+const per = (make, C = 1) => { const w = make(), cs = chunks[C - 1], run = n => { for (let i = 0; i < n; i++) w(cs[i & 63]) }; run(1 << 13); run(1 << 13); return Math.min(count(() => run(CALLS)), count(() => run(CALLS))) / CALLS }
+const mono = (process, opts) => { const s = stftStream(process, { frameSize: N, maxChunk: F, ...opts }); return c => s.write(c[0], outs[0][0]) }
+const multi = (process, opts) => { const s = stftStream(process, { frameSize: N, maxChunk: F, ...opts }), o = outs[opts.channels - 1]; return c => s.write(c, o) }
+const cases = {
+	'mono, polar': () => per(() => mono(polar, {})),
+	'mono, complex': () => per(() => mono(complex, { complex: true })),
+	// two streams of the code: V8 no longer folds one closure's constants into it (a manifest keeps a stream a channel)
+	'two mono streams': () => per(() => { const a = mono(polar, {}), b = mono(polar, {}); return c => { a(c); b(c) } }),
+	'two channels, complex': () => per(() => multi(complex, { channels: 2, complex: true }), 2),
+	'three channels, joint': () => per(() => multi(joint, { channels: 3, complex: true, joint: true }), 3),
+	'analysis hop not whole': () => per(() => mono(polar, { anaHop: 256 / 1.5, synHop: 256 })),
+	'control, write(chunk): new arrays': () => per(() => { const s = stftStream(polar, { frameSize: N }); return c => s.write(c[0]) }),
+}
+const name = process.argv[1]
+console.log(JSON.stringify(name ? cases[name]() : Object.keys(cases)))
+`
+t('stftStream write(chunk, out): nothing allocated a call in the steady state, mono, two streams, channels, joint, a hop not whole', async () => {
+	const { default: v8 } = await import('node:v8')
+	if (!v8.GCProfiler) return console.warn(`skipped: Node ${process.version} has no v8.GCProfiler to count with (18.15 and later have it)`)
+	const { execFileSync } = await import('node:child_process')
+	const child = (...a) => JSON.parse(execFileSync(process.execPath, ['--expose-gc', '--no-concurrent-recompilation', '--no-allocation-site-pretenuring', '--input-type=module', '-e', ALLOC_CHILD, ...a], { encoding: 'utf8' }))
+	for (const k of child()) {
+		const b = child(k)
+		if (k.startsWith('control')) { if (!(b > 1)) throw new Error(`the measure does not see the old form's arrays: ${b} bytes a call`) }
+		else if (!(b <= 1 / 16)) throw new Error(`${k}: ${b} bytes a call (at most 1/16)`)
+	}
+})

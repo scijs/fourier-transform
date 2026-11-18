@@ -1,3 +1,15 @@
+# Unreleased
+
+## Added
+
+- `stftStream` `write(chunk, out, length)`, `flush(out)`: the samples into `out`, the count returned; nothing allocated a call (on Node 22 and 20: 8 bytes a call at frames of 16384 and up, 3 to 4.75 for a second stream in a process).
+- `stftStream` `opts.maxChunk`: the stream's memory made up front for chunks up to it.
+- `stftStream`, `stftBatch`: `process` may edit its bins in place and return nothing.
+
+## Fixed
+
+- `stftStream` allocated beyond the arrays it returns: a closure's context every write and every frame; with two or more streams, a number every sample; past 2^31 samples, numbers every write.
+
 # 2.3.0
 
 ## Added

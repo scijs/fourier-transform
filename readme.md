@@ -125,7 +125,7 @@ const recovered = istft(frames, { frameSize: 2048, hopSize: 512, signalLength: w
 
 Processes each frame through a callback and overlap-adds the result.
 
-- `process(mag, phase, state, ctx)` → `{ mag, phase }`
+- `process(mag, phase, state, ctx)` → `{ mag, phase }`, or nothing when it edited `mag` and `phase` in place
   - `mag`, `phase` — `Float64Array(half + 1)`
   - `state` — persistent object across frames
   - `ctx` — `{ N, half, hop, anaHop, synHop, freqPerBin, frameStart, sampleRate, opts }`
@@ -133,7 +133,7 @@ Processes each frame through a callback and overlap-adds the result.
     - `ctx.opts` — cloned copy of `opts`. Use this to pass custom parameters (e.g. `ratio`, `ratioFn`) through to your process callback.
 - `opts.anaHop` — analysis hop (default: `hopSize`).
 - `opts.synHop` — synthesis hop (default: `hopSize`). When `anaHop !== synHop`, the output is time-stretched or compressed.
-- `opts.complex` – `process(re, im, state, ctx)` → `{ re, im }` gets the complex bins (`Float64Array(half + 1)`, editable in place) instead of polar form: a process that rotates or scales bins skips the `atan2` / `sin` / `cos` round trip.
+- `opts.complex` – `process(re, im, state, ctx)` → `{ re, im }`, or nothing when edited in place, gets the complex bins (`Float64Array(half + 1)`) instead of polar form: a process that rotates or scales bins skips the `atan2` / `sin` / `cos` round trip.
 - Returns `Float32Array` of length `round(data.length * synHop / anaHop)` (same as input when `anaHop === synHop`).
 
 ```js
@@ -151,6 +151,8 @@ Streaming version of `stftBatch`. Returns `{ write(chunk), flush() }`.
 - Supports `opts.anaHop` / `opts.synHop` for time-stretching in streaming context, and `opts.complex`.
 - `opts.channels`: one stream for that many channels, `write(chunks)` and `flush()` taking and returning an array of them. The frames of every channel sit at the same places, the hops are asked once a frame, `process` gets a state per channel and `ctx.channel`; each channel's samples are the ones its own stream gives, and two channels' transforms run at once (`pair`).
 - `opts.joint` (with `channels` and `complex`): `process(res, ims, state, ctx)` once a frame with every channel's bins, an array a channel, edited in place, and one state: for a step that turns the channels together (a vocoder that keeps the phase between them).
+- `write(chunk, out, length)` and `flush(out)` write the samples into `out` (a `Float32Array`; with `channels`, an array of them) from its start instead of returning new arrays, and return how many: the same bits, call for call. `out` takes as many as it holds, the rest waits for the next call. `length`: the samples taken from the chunk's start, when the chunk is a longer array.
+- `opts.maxChunk` (default `frameSize`): the longest chunk `write` is given. The stream's memory is made for it when the stream is made, so a real-time loop allocates nothing; a longer chunk grows it once. Measured on Node 25, 22 and 20 at frames up to 8192; two limits on Node 22 and 20: frames of 16384 and up allocate 8 bytes a call, and a second stream made in a process allocates 3 to 4.75 bytes a call. With constant hops a write gives at most `ceil(maxChunk · synHop / anaHop) + 1` samples and a flush at most `round(frameSize / 2 · (synHop / anaHop + 1))`: an `out` of the larger holds every call.
 
 ```js
 const stream = stftStream((mag, phase) => ({ mag, phase }), { frameSize: 2048 })
@@ -160,6 +162,19 @@ for (const chunk of audioChunks) {
   // emit processed...
 }
 const tail = stream.flush()
+```
+
+A real-time loop, 128 samples a call, nothing allocated (a callback that edits in place and returns nothing allocates nothing either):
+
+```js
+const gain = mag => { for (let k = 0; k < mag.length; k++) mag[k] *= 0.5 }
+const stream = stftStream(gain, { frameSize: 2048, maxChunk: 128 })
+const out = new Float32Array(2048)
+
+function block (input) {
+  const n = stream.write(input, out)   // out[0..n): the samples now final
+  // copy out[0..n) on, into a FIFO say: a subarray of it a call would be an allocation a call
+}
 ```
 
 ### `stftAnalysisStream(opts?)` — streaming analysis
